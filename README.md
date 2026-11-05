@@ -20,8 +20,19 @@ cd d:\sonzai
 .\.venv-worker\Scripts\python.exe services\worker\worker.py
 ```
 
-Default `DEMO_MODE=true` writes placeholder audio (no GPU).  
-For real music: follow [`notebooks/ace_step_colab.md`](notebooks/ace_step_colab.md), set `DEMO_MODE=false` + `ACE_STEP_URL`.
+### Real music (no local GPU)
+
+1. Get a free key at https://acemusic.ai/api-key  
+2. Set in `services/worker/.env`:
+
+```env
+DEMO_MODE=false
+ACEMUSIC_API_KEY=your_key
+```
+
+3. Restart the worker.
+
+Details: [`notebooks/ace_step_colab.md`](notebooks/ace_step_colab.md)
 
 ## Features now
 

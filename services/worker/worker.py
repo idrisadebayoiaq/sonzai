@@ -142,14 +142,15 @@ def process_job(sb, job: dict) -> None:
 
             voice_used = False
             voice_converted = False
+            voice_referenced = False
             sample_path = job.get("voice_sample_path")
             if sample_path:
-                # keep original extension if present
                 ext = Path(sample_path).suffix or ".wav"
                 voice_path = tmp_path / f"voice{ext}"
                 voice_used = download_voice_sample(sb, sample_path, voice_path)
 
-            if DEMO_MODE or not ace_step.is_configured():
+            use_demo = DEMO_MODE or not ace_step.is_configured()
+            if use_demo:
                 demo_dur = min(12.0, float(gen["duration_sec"]))
                 duration = write_demo_wav(
                     wav_path,
@@ -158,33 +159,39 @@ def process_job(sb, job: dict) -> None:
                     title=job.get("title") or "demo",
                 )
                 meta_engine = "demo_wav"
+                final_audio = wav_path
             else:
+                gen_out = mp3_path if ace_step.provider_name() == "acemusic" else wav_path
                 duration = ace_step.generate_to_wav(
                     lyrics=gen["lyrics"],
                     prompt=gen["prompt"],
                     negative_prompt=gen["negative_prompt"],
                     bpm=int(gen["bpm"]),
                     duration_sec=int(gen["duration_sec"]),
-                    out_path=wav_path,
+                    out_path=gen_out,
+                    voice_sample=voice_path if voice_used else None,
                 )
-                meta_engine = "ace_step"
+                meta_engine = ace_step.provider_name()
+                final_audio = gen_out
+                voice_referenced = bool(voice_used and meta_engine == "acemusic")
 
             set_progress(sb, job_id, 55, "vocals")
-            final_wav = wav_path
             if voice_used and voice_convert.is_configured():
                 voice_convert.convert_song_with_voice(
-                    song_wav=wav_path,
+                    song_wav=final_audio,
                     voice_sample=voice_path,
                     out_wav=converted_path,
                 )
-                final_wav = converted_path
+                final_audio = converted_path
                 voice_converted = True
-            elif voice_used:
-                # No RVC on free/demo path — keep song, flag for UI
-                voice_converted = False
 
             set_progress(sb, job_id, 75, "mixing")
-            wav_to_mp3(final_wav, mp3_path)
+            if final_audio.suffix.lower() == ".mp3" and final_audio.resolve() == mp3_path.resolve():
+                pass
+            elif final_audio.suffix.lower() == ".mp3":
+                mp3_path.write_bytes(final_audio.read_bytes())
+            else:
+                wav_to_mp3(final_audio, mp3_path)
 
             storage_path = f"{user_id}/{job_id}.mp3"
             set_progress(sb, job_id, 88, "uploading")
@@ -208,7 +215,9 @@ def process_job(sb, job: dict) -> None:
                     "bpm": gen["bpm"],
                     "tags": gen["tags"],
                     "demo_mode": meta_engine == "demo_wav",
+                    "engine_provider": meta_engine,
                     "voice_sample_provided": voice_used,
+                    "voice_referenced": voice_referenced,
                     "voice_converted": voice_converted,
                     "energy": job.get("energy"),
                 },
@@ -234,7 +243,8 @@ def process_job(sb, job: dict) -> None:
 
 def main():
     print(
-        f"Sonzai worker starting (DEMO_MODE={DEMO_MODE}, ACE_STEP={ace_step.is_configured()}, RVC={voice_convert.is_configured()})",
+        f"Sonzai worker starting (DEMO_MODE={DEMO_MODE}, provider={ace_step.provider_name()}, "
+        f"ACE_CONFIGURED={ace_step.is_configured()}, RVC={voice_convert.is_configured()})",
         flush=True,
     )
     sb = client()

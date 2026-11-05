@@ -1,8 +1,10 @@
 """
-Voice conversion hook (RVC / similar).
+Voice conversion backends.
 
-Free DEMO path: if a voice sample exists, we record it in meta but do not clone
-(no GPU). When RVC_CMD or RVC_URL is configured, convert vocals onto the mix.
+1) RVC_URL / RVC_CMD — dedicated singing conversion (best)
+2) If AceMusic key is set and voice sample exists — already passed as reference
+   in ace_step; this module then becomes a no-op passthrough.
+3) Otherwise passthrough (copy song wav/mp3 as-is)
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from pathlib import Path
 import httpx
 
 RVC_URL = os.getenv("RVC_URL", "").rstrip("/")
-RVC_CMD = os.getenv("RVC_CMD", "")  # e.g. path to a local CLI wrapper
+RVC_CMD = os.getenv("RVC_CMD", "")
 
 
 def is_configured() -> bool:
@@ -32,7 +34,7 @@ def convert_song_with_voice(
         cmd = RVC_CMD.format(song=str(song_wav), voice=str(voice_sample), out=str(out_wav))
         subprocess.run(cmd, shell=True, check=True)
         if not out_wav.exists():
-            raise RuntimeError("RVC_CMD finished but output wav missing")
+            raise RuntimeError("RVC_CMD finished but output missing")
         return
 
     if RVC_URL:
@@ -44,10 +46,10 @@ def convert_song_with_voice(
                         "song": ("song.wav", sf, "audio/wav"),
                         "voice": ("voice.wav", vf, "audio/wav"),
                     },
+                    headers={"User-Agent": "curl/8.4.0"},
                 )
             resp.raise_for_status()
             out_wav.write_bytes(resp.content)
         return
 
-    # Passthrough when not configured
     shutil.copyfile(song_wav, out_wav)

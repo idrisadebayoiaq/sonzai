@@ -1,56 +1,61 @@
-# ACE-Step on Google Colab (free GPU)
+# Real music generation (no local GPU needed)
 
-Use this when you want **real** music instead of DEMO_MODE tones.
+Sonzai prefers the **free AceMusic cloud API** (official ACE-Step hosted). Colab is optional fallback.
 
-## 1. Open Colab
+## Option A — AceMusic free API (recommended)
 
-Create a GPU runtime notebook and install ACE-Step per the upstream README:
-
-- https://github.com/ace-step/ACE-Step-1.5
-
-## 2. Minimal FastAPI shim (run in Colab)
-
-```python
-# After ACE-Step is installed and weights downloaded in the notebook:
-from fastapi import FastAPI
-from fastapi.responses import Response
-from pydantic import BaseModel
-import uvicorn
-
-app = FastAPI()
-
-class GenReq(BaseModel):
-    lyrics: str
-    prompt: str
-    negative_prompt: str = ""
-    bpm: int = 110
-    duration_sec: int = 120
-
-@app.post("/generate")
-def generate(req: GenReq):
-    # Call your ACE-Step generate function here → bytes of WAV
-    wav_bytes = b""  # replace with model output
-    return Response(content=wav_bytes, media_type="audio/wav")
-
-# Expose with ngrok / cloudflared, then set on the worker:
-# ACE_STEP_URL=https://xxxx.ngrok-free.app
-# DEMO_MODE=false
-uvicorn.run(app, host="0.0.0.0", port=7860)
-```
-
-## 3. Point the Sonzai worker at it
-
-In `services/worker/.env`:
+1. Open https://acemusic.ai/api-key and sign in / create a free account.  
+2. Copy the API key.  
+3. Put it in `services/worker/.env` (and optionally root `.env`):
 
 ```env
 DEMO_MODE=false
-ACE_STEP_URL=https://YOUR-TUNNEL-URL
+ACEMUSIC_API_KEY=your_key_here
 ```
 
-Restart the worker. New jobs will call Colab instead of writing demo tones.
+4. Restart the worker:
 
-## Notes
+```powershell
+cd d:\sonzai
+.\.venv-worker\Scripts\python.exe services\worker\worker.py
+```
 
-- Free Colab sessions disconnect — fine for demos, not 24/7.
-- Keep Style Pack prompts (already stored on each job) — they improve accent/genre.
-- Stop the tunnel when idle.
+New jobs generate **real ACE-Step songs** (not demo tones).  
+If you also upload a voice sample, it is sent as reference audio to AceMusic.
+
+### Optional AceMusic tweaks
+
+```env
+ACEMUSIC_BASE_URL=https://api.acemusic.ai
+ACEMUSIC_MODEL=acemusic/acestep-v1.5-turbo
+ACEMUSIC_MAX_DURATION=90
+```
+
+## Option B — Google Colab GPU + tunnel
+
+Use when you want self-hosted ACE-Step.
+
+1. Open Colab with a GPU runtime.  
+2. Install ACE-Step 1.5: https://github.com/ace-step/ACE-Step-1.5  
+3. Run `uv run acestep-api` or the OpenRouter-compatible server.  
+4. Expose with ngrok/cloudflared.  
+5. Worker `.env`:
+
+```env
+DEMO_MODE=false
+ACE_STEP_URL=https://YOUR-TUNNEL
+```
+
+## Voice cloning (RVC) — optional
+
+AceMusic reference audio helps style/timbre but is **not** full RVC cloning.
+
+For true singing voice conversion later:
+
+```env
+RVC_URL=https://your-rvc-server
+# or
+RVC_CMD=python path/to/rvc_cli.py --song {song} --voice {voice} --out {out}
+```
+
+Until RVC is set, Sonzai still generates the full song; uploaded voice is used as AceMusic reference when possible.
