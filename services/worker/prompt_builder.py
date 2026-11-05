@@ -64,6 +64,19 @@ def build_generation_input(job: dict[str, Any], country: dict[str, Any], genre: 
     pos.append(f"BPM {bpm}")
     pos.append(f"song type: {song_type}")
 
+    energy = job.get("energy")
+    if energy is not None:
+        try:
+            e = int(energy)
+            if e <= 2:
+                pos.append("sparse arrangement, restrained dynamics")
+            elif e >= 4:
+                pos.append("dense instrumentation, high energy, punchy mix")
+            else:
+                pos.append("balanced energy and instrumentation")
+        except (TypeError, ValueError):
+            pass
+
     neg = list(country.get("accent", {}).get("negative", []))
     neg.extend(genre.get("negative", []))
     neg.extend(["low quality", "distorted mush"])
@@ -74,5 +87,5 @@ def build_generation_input(job: dict[str, Any], country: dict[str, Any], genre: 
         "lyrics": (job.get("lyrics") or "").strip(),
         "bpm": bpm,
         "duration_sec": DURATION.get(song_type, 180),
-        "tags": [job.get("country"), job.get("genre"), song_type, mood],
+        "tags": [job.get("country"), job.get("genre"), song_type, mood, f"energy:{energy}"],
     }

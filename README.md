@@ -1,34 +1,45 @@
 # Sonzai
 
-AI music studio UI — country accent, genre, lyrics → song.
+AI music studio — country accent, genre, lyrics (+ optional voice) → song.
 
-## Deploy the website (Vercel)
+## Deploy website (Vercel)
 
-1. Import [idrisadebayoiaq/sonzai](https://github.com/idrisadebayoiaq/sonzai) into Vercel.
-2. Set **Root Directory** to `apps/frontend`.
-3. Add environment variables:
+1. Import https://github.com/idrisadebayoiaq/sonzai  
+2. **Root Directory:** `apps/frontend`  
+3. Env vars:
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-4. Deploy.
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`  
+4. In Supabase Auth, add your Vercel URL to redirect allow-list.
 
-Auth and the create/library UI talk to Supabase directly. Song generation worker / ACE-Step come later.
+## Local worker (processes jobs)
 
-## Local frontend
+Jobs created in the web UI sit as `pending` until a worker runs:
 
-```bash
-cd apps/frontend
-cp .env.local.example .env.local
-# fill anon key
-npm install
-npm run dev
+```powershell
+cd d:\sonzai
+.\.venv-worker\Scripts\python.exe services\worker\worker.py
 ```
 
-Open http://localhost:3000
+Default `DEMO_MODE=true` writes placeholder audio (no GPU).  
+For real music: follow [`notebooks/ace_step_colab.md`](notebooks/ace_step_colab.md), set `DEMO_MODE=false` + `ACE_STEP_URL`.
 
-## Repo layout
+## Features now
 
-- `apps/frontend` — Next.js site (deploy this)
-- `services/api` — FastAPI (optional later)
-- `services/worker` — GPU / demo worker (later)
-- `packages/style-packs` — country/genre prompt packs
-- `doc/` — build guides
+- Create: country, genre, song type, mood, language mix, vocal style, energy, BPM, lyrics  
+- Optional voice upload + consent  
+- Job progress stages + cancel  
+- Library play/delete  
+- Daily free limit (8 jobs / user)  
+- Style packs for NG/GH/KE/ZA/US/GB  
+- ACE-Step + RVC hooks on the worker  
+
+## Layout
+
+| Path | Role |
+|---|---|
+| `apps/frontend` | Next.js site (Vercel) |
+| `services/worker` | Job processor |
+| `services/api` | Optional FastAPI |
+| `packages/style-packs` | Accent/genre DNA |
+| `notebooks/` | Colab ACE-Step guide |
+| `doc/` | Full build docs |

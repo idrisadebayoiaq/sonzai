@@ -2,22 +2,29 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { listSongs } from "@/lib/api";
+import { deleteSong, listSongs } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 
 type Song = {
   id: string;
   title: string;
+  storage_path?: string;
   signed_url?: string | null;
   duration_sec?: number | null;
   created_at?: string;
-  meta?: { demo_mode?: boolean; tags?: string[] };
+  meta?: { demo_mode?: boolean; tags?: string[]; voice_sample_provided?: boolean };
 };
 
 export default function LibraryPage() {
   const [songs, setSongs] = useState<Song[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  async function refresh(token: string) {
+    const rows = await listSongs(token);
+    setSongs(rows);
+  }
 
   useEffect(() => {
     const supabase = createClient();
@@ -29,8 +36,7 @@ export default function LibraryPage() {
         return;
       }
       try {
-        const rows = await listSongs(token);
-        setSongs(rows);
+        await refresh(token);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load songs");
       } finally {
@@ -38,6 +44,19 @@ export default function LibraryPage() {
       }
     });
   }, []);
+
+  async function onDelete(song: Song) {
+    if (!song.storage_path) return;
+    setDeletingId(song.id);
+    try {
+      await deleteSong(song.id, song.storage_path);
+      setSongs((prev) => prev.filter((s) => s.id !== song.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
@@ -73,9 +92,22 @@ export default function LibraryPage() {
           >
             <div className="mb-4 flex items-center justify-between gap-3">
               <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">{song.title}</h2>
-              {song.meta?.demo_mode && (
-                <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">demo</span>
-              )}
+              <div className="flex items-center gap-3">
+                {song.meta?.demo_mode && (
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--muted)]">demo</span>
+                )}
+                {song.meta?.voice_sample_provided && (
+                  <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent-2)]">voice</span>
+                )}
+                <button
+                  type="button"
+                  className="text-xs text-[var(--danger)]"
+                  disabled={deletingId === song.id}
+                  onClick={() => onDelete(song)}
+                >
+                  {deletingId === song.id ? "Deleting…" : "Delete"}
+                </button>
+              </div>
             </div>
             {song.signed_url ? (
               <audio controls src={song.signed_url} className="w-full" />
@@ -83,7 +115,9 @@ export default function LibraryPage() {
               <p className="text-sm text-[var(--muted)]">No playable URL</p>
             )}
             {song.meta?.tags?.length ? (
-              <p className="mt-3 text-xs capitalize text-[var(--muted)]">{song.meta.tags.filter(Boolean).join(" · ")}</p>
+              <p className="mt-3 text-xs capitalize text-[var(--muted)]">
+                {song.meta.tags.filter(Boolean).join(" · ")}
+              </p>
             ) : null}
           </li>
         ))}

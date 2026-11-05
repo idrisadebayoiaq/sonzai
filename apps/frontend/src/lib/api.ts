@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 
+const DAILY_JOB_LIMIT = 8;
+
 export type CreateJobPayload = {
   lyrics: string;
   country: string;
@@ -10,6 +12,8 @@ export type CreateJobPayload = {
   language_mix?: string;
   vocal_style?: string;
   title?: string;
+  voice_sample_path?: string | null;
+  energy?: number | null;
 };
 
 async function requireUser() {
@@ -30,13 +34,42 @@ async function signedSongUrl(storagePath: string) {
   return data.signedUrl;
 }
 
+async function assertUnderDailyLimit(supabase: ReturnType<typeof createClient>, userId: string) {
+  const start = new Date();
+  start.setUTCHours(0, 0, 0, 0);
+  const { count, error } = await supabase
+    .from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .gte("created_at", start.toISOString());
+  if (error) throw new Error(error.message);
+  if ((count ?? 0) >= DAILY_JOB_LIMIT) {
+    throw new Error(`Daily free limit reached (${DAILY_JOB_LIMIT} songs). Try again tomorrow.`);
+  }
+}
+
+export async function uploadVoiceSample(file: File) {
+  const { supabase, user } = await requireUser();
+  const ext = file.name.split(".").pop()?.toLowerCase() || "wav";
+  const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("voice-samples").upload(path, file, {
+    contentType: file.type || "audio/mpeg",
+    upsert: false,
+  });
+  if (error) throw new Error(error.message);
+  return path;
+}
+
 export async function createJob(_token: string, payload: CreateJobPayload) {
   const { supabase, user } = await requireUser();
+  await assertUnderDailyLimit(supabase, user.id);
+
   const { data, error } = await supabase
     .from("jobs")
     .insert({
       user_id: user.id,
       status: "pending",
+      stage: "queued",
       lyrics: payload.lyrics.trim(),
       country: payload.country.toUpperCase(),
       genre: payload.genre.toLowerCase(),
@@ -46,6 +79,8 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
       language_mix: payload.language_mix ?? null,
       vocal_style: payload.vocal_style ?? null,
       title: payload.title || "Untitled",
+      voice_sample_path: payload.voice_sample_path ?? null,
+      energy: payload.energy ?? null,
       progress: 0,
     })
     .select("id, status")
@@ -55,6 +90,16 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
     throw new Error(error?.message || "Failed to create job");
   }
   return { job_id: data.id as string, status: data.status as string };
+}
+
+export async function cancelJob(jobId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase
+    .from("jobs")
+    .update({ status: "cancelled", stage: "cancelled", progress: 100 })
+    .eq("id", jobId)
+    .in("status", ["pending", "processing"]);
+  if (error) throw new Error(error.message);
 }
 
 export async function getJob(_token: string, jobId: string) {
@@ -84,6 +129,7 @@ export async function getJob(_token: string, jobId: string) {
     id: job.id,
     status: job.status,
     progress: job.progress ?? 0,
+    stage: job.stage,
     error: job.error,
     title: job.title,
     country: job.country,
@@ -120,4 +166,11 @@ export async function listSongs(_token: string) {
     });
   }
   return songs;
+}
+
+export async function deleteSong(songId: string, storagePath: string) {
+  const { supabase } = await requireUser();
+  await supabase.storage.from("generated-songs").remove([storagePath]);
+  const { error } = await supabase.from("songs").delete().eq("id", songId);
+  if (error) throw new Error(error.message);
 }

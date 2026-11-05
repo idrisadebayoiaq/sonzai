@@ -37,6 +37,21 @@ export const LANGUAGE_MIXES: Record<string, { id: string; label: string }[]> = {
     { id: "igbo_english", label: "Igbo + English" },
     { id: "hausa_english", label: "Hausa + English" },
   ],
+  GH: [{ id: "nigerian_english", label: "Ghanaian English" }],
+  KE: [{ id: "nigerian_english", label: "Kenyan English" }],
+  ZA: [{ id: "nigerian_english", label: "South African English" }],
 };
 
 export const VOCAL_STYLES = ["soft", "energetic", "raspy", "choir"];
+
+export const STAGE_LABELS: Record<string, string> = {
+  queued: "Queued",
+  composing: "Building style",
+  generating: "Generating music",
+  vocals: "Vocals",
+  mixing: "Mixing",
+  uploading: "Uploading",
+  done: "Done",
+  failed: "Failed",
+  cancelled: "Cancelled",
+};

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getJob } from "@/lib/api";
+import { cancelJob, getJob } from "@/lib/api";
+import { STAGE_LABELS } from "@/lib/options";
 import { createClient } from "@/lib/supabase/client";
 import { Waveform } from "@/components/Waveform";
 
@@ -11,6 +12,7 @@ type Job = {
   id: string;
   status: string;
   progress: number;
+  stage?: string | null;
   error?: string | null;
   title?: string | null;
   country: string;
@@ -19,7 +21,11 @@ type Job = {
     title: string;
     signed_url?: string | null;
     duration_sec?: number | null;
-    meta?: { demo_mode?: boolean };
+    meta?: {
+      demo_mode?: boolean;
+      voice_sample_provided?: boolean;
+      voice_converted?: boolean;
+    };
   } | null;
 };
 
@@ -27,6 +33,7 @@ export default function JobPage() {
   const params = useParams<{ id: string }>();
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,7 +43,7 @@ export default function JobPage() {
       try {
         const data = await getJob(token, params.id);
         if (!cancelled) setJob(data);
-        if (data.status === "done" || data.status === "failed") {
+        if (["done", "failed", "cancelled"].includes(data.status)) {
           if (timer) clearInterval(timer);
         }
       } catch (err) {
@@ -62,12 +69,26 @@ export default function JobPage() {
   }, [params.id]);
 
   const done = job?.status === "done" && job.song?.signed_url;
+  const canCancel = job && ["pending", "processing"].includes(job.status);
+
+  async function onCancel() {
+    if (!job) return;
+    setCancelling(true);
+    try {
+      await cancelJob(job.id);
+      setJob({ ...job, status: "cancelled", stage: "cancelled", progress: 100 });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Cancel failed");
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-2xl flex-col justify-center px-6 py-12">
       <p className="anim-rise text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Session</p>
       <h1 className="anim-rise-delay-1 mt-3 font-[family-name:var(--font-display)] text-4xl font-bold">
-        {done ? "Ready" : "Generating"}
+        {done ? "Ready" : job?.status === "cancelled" ? "Cancelled" : "Generating"}
       </h1>
 
       {error && <p className="mt-6 text-[var(--danger)]">{error}</p>}
@@ -82,11 +103,11 @@ export default function JobPage() {
               </p>
             </div>
             <span className="rounded-full border border-[var(--line)] px-3 py-1 text-xs capitalize text-[var(--muted)]">
-              {job.status}
+              {STAGE_LABELS[job.stage || job.status] || job.status}
             </span>
           </div>
 
-          {!done && (
+          {!done && job.status !== "cancelled" && job.status !== "failed" && (
             <div className="h-28 rounded-xl border border-[var(--line)] bg-black/20 px-4 py-3">
               <Waveform className="h-full" />
             </div>
@@ -94,7 +115,7 @@ export default function JobPage() {
 
           <div>
             <div className="mb-2 flex justify-between text-sm text-[var(--muted)]">
-              <span>Progress</span>
+              <span>{STAGE_LABELS[job.stage || ""] || "Progress"}</span>
               <span>{job.progress}%</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-black/35">
@@ -105,13 +126,24 @@ export default function JobPage() {
             </div>
           </div>
 
+          {canCancel && (
+            <button type="button" className="btn-ghost" disabled={cancelling} onClick={onCancel}>
+              {cancelling ? "Cancelling…" : "Cancel job"}
+            </button>
+          )}
+
           {job.error && <p className="text-sm text-[var(--danger)]">{job.error}</p>}
 
           {done && (
             <div className="space-y-4 border-t border-[var(--line)] pt-5">
               {job.song?.meta?.demo_mode && (
                 <p className="text-sm text-[var(--muted)]">
-                  Demo audio for now — the full AI music engine wires in later.
+                  Demo audio for now — connect ACE-Step (Colab/GPU) for real music generation.
+                </p>
+              )}
+              {job.song?.meta?.voice_sample_provided && !job.song?.meta?.voice_converted && (
+                <p className="text-sm text-[var(--muted)]">
+                  Voice sample was saved. Conversion activates when an RVC server is configured on the worker.
                 </p>
               )}
               <audio controls src={job.song!.signed_url!} className="w-full" />

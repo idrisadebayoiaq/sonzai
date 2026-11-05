@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createJob } from "@/lib/api";
+import { createJob, uploadVoiceSample } from "@/lib/api";
 import { COUNTRIES, GENRES, LANGUAGE_MIXES, MOODS, SONG_TYPES, VOCAL_STYLES } from "@/lib/options";
 import { createClient } from "@/lib/supabase/client";
 
@@ -20,6 +20,9 @@ export default function CreatePage() {
   const [languageMix, setLanguageMix] = useState("nigerian_english_pidgin");
   const [vocalStyle, setVocalStyle] = useState("energetic");
   const [bpm, setBpm] = useState("");
+  const [energy, setEnergy] = useState(3);
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [consent, setConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -49,9 +52,17 @@ export default function CreatePage() {
       setError("Sign in first to generate a song.");
       return;
     }
+    if (voiceFile && !consent) {
+      setError("Confirm you own this voice (or have permission) before uploading.");
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
+      let voice_sample_path: string | null = null;
+      if (voiceFile) {
+        voice_sample_path = await uploadVoiceSample(voiceFile);
+      }
       const { job_id } = await createJob(token, {
         title: title || "Untitled",
         lyrics,
@@ -62,6 +73,8 @@ export default function CreatePage() {
         language_mix: langOptions.length ? languageMix : undefined,
         vocal_style: vocalStyle,
         bpm: bpm ? Number(bpm) : null,
+        energy,
+        voice_sample_path,
       });
       router.push(`/jobs/${job_id}`);
     } catch (err) {
@@ -78,7 +91,7 @@ export default function CreatePage() {
           Create
         </h1>
         <p className="anim-rise-delay-2 mt-3 text-[var(--muted)]">
-          Shape the accent, groove, and delivery before the beat lands.
+          Shape the accent, groove, and delivery — optionally add your voice.
         </p>
       </div>
 
@@ -162,7 +175,7 @@ export default function CreatePage() {
                 ))}
               </select>
             </label>
-            <label className="field block text-sm sm:col-span-2">
+            <label className="field block text-sm">
               <span className="mb-2 block text-[var(--muted)]">BPM (optional)</span>
               <input
                 value={bpm}
@@ -171,6 +184,17 @@ export default function CreatePage() {
                 type="number"
                 min={60}
                 max={200}
+              />
+            </label>
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Energy ({energy}/5)</span>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={energy}
+                onChange={(e) => setEnergy(Number(e.target.value))}
+                className="w-full accent-[var(--accent)]"
               />
             </label>
           </div>
@@ -186,6 +210,32 @@ export default function CreatePage() {
               placeholder={"Verse 1...\n\nChorus..."}
             />
           </label>
+
+          <div className="space-y-3 rounded-xl border border-[var(--line)] bg-black/15 p-4">
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Your voice (optional, 10–60s)</span>
+              <input
+                type="file"
+                accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/webm,.mp3,.wav,.m4a"
+                onChange={(e) => setVoiceFile(e.target.files?.[0] ?? null)}
+              />
+            </label>
+            {voiceFile && (
+              <p className="text-xs text-[var(--muted)]">Selected: {voiceFile.name}</p>
+            )}
+            <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
+              <input
+                type="checkbox"
+                checked={consent}
+                onChange={(e) => setConsent(e.target.checked)}
+                className="mt-1 accent-[var(--accent)]"
+              />
+              <span>
+                I own this voice recording or have permission to use it for AI singing conversion. I will not upload
+                celebrity or other people’s voices without consent.
+              </span>
+            </label>
+          </div>
 
           <div className="flex flex-wrap items-center gap-4">
             <button type="submit" disabled={loading || !token} className="btn-primary">
@@ -206,7 +256,9 @@ export default function CreatePage() {
             <Row label="Type" value={SONG_TYPES.find((s) => s.id === songType)?.label ?? songType} />
             <Row label="Mood" value={mood} />
             <Row label="Vocal" value={vocalStyle} />
+            <Row label="Energy" value={`${energy}/5`} />
             {bpm && <Row label="BPM" value={bpm} />}
+            <Row label="Voice" value={voiceFile ? "Attached" : "None"} />
           </dl>
           <p className="border-t border-[var(--line)] pt-4 text-sm leading-relaxed text-[var(--muted)]">
             These choices steer accent tags, drums, and energy so a {countryName} {genre} request does not sound like
