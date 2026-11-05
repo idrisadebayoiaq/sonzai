@@ -4,7 +4,7 @@ import { estimateDurationSec } from "@/lib/songLength";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
-export const maxDuration = 800;
+export const maxDuration = 300;
 
 function buildPrompt(job: Record<string, unknown>) {
   const options = (job.options || {}) as Record<string, unknown>;
