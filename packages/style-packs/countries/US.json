@@ -1,0 +1,23 @@
+{
+  "code": "US",
+  "name": "United States",
+  "default_genres": ["pop", "hiphop", "rnb", "gospel"],
+  "default_language_mix": null,
+  "accent": {
+    "positive": [
+      "General American English vocal delivery",
+      "contemporary US pop phrasing",
+      "clear lead vocal"
+    ],
+    "negative": [
+      "robotic TTS",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "modern pop drums",
+    "synth bass",
+    "polished mix"
+  ],
+  "prompt_prefix": "American contemporary song performance"
+}

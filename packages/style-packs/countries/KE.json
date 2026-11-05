@@ -1,0 +1,24 @@
+{
+  "code": "KE",
+  "name": "Kenya",
+  "default_genres": ["afrosoul", "hiphop", "afrobeats", "gospel"],
+  "default_language_mix": "nigerian_english",
+  "accent": {
+    "positive": [
+      "Kenyan English vocal delivery",
+      "natural Nairobi speech rhythm",
+      "clear mid-range lead vocal"
+    ],
+    "negative": [
+      "American pop vocal",
+      "robotic TTS",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "groovy percussion",
+    "melodic guitar",
+    "warm bass"
+  ],
+  "prompt_prefix": "Kenyan contemporary song performance"
+}

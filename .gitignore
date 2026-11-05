@@ -1,0 +1,36 @@
+# Python
+.venv-api/
+.venv-worker/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+**/node_modules/
+**/.next/
+**/out/
+nm_old_*/
+node_modules_broken_*/
+**/npm-install.log
+
+# Env secrets
+.env
+.env.local
+**/.env
+!**/.env.example
+!**/.env.local.example
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.cursor/
+
+# Temp / local
+tmp/
+*.wav
+!packages/**/*.wav
+*.log

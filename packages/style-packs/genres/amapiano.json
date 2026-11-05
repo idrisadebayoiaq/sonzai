@@ -1,0 +1,12 @@
+{
+  "id": "amapiano",
+  "bpm_range": [110, 115],
+  "default_bpm": 112,
+  "energy_default": 3,
+  "drums": "log drum centered percussion, spacious groove, soft shakers",
+  "bass": "deep rolling bass with log-drum punches",
+  "harmony": "wide piano chords, airy pads",
+  "arrangement": "long groovy sections, tasteful vocal hooks",
+  "positive": ["Amapiano groove", "spacious mix", "hypnotic piano"],
+  "negative": ["generic EDM drop", "heavy metal guitars", "US country banjo"]
+}

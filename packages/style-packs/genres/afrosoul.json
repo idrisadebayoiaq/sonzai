@@ -1,0 +1,12 @@
+{
+  "id": "afrosoul",
+  "bpm_range": [80, 105],
+  "default_bpm": 92,
+  "energy_default": 2,
+  "drums": "soft organic percussion, gentle kick",
+  "bass": "warm rounded bass",
+  "harmony": "soulful chords, emotional hooks",
+  "arrangement": "intimate verse, swelling chorus",
+  "positive": ["Afro-soul emotion", "smooth vocal-led arrangement"],
+  "negative": ["aggressive metal", "harsh industrial noise"]
+}

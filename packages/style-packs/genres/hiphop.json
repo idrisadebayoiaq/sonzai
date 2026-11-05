@@ -1,0 +1,12 @@
+{
+  "id": "hiphop",
+  "bpm_range": [80, 100],
+  "default_bpm": 90,
+  "energy_default": 3,
+  "drums": "hard-hitting hip-hop drums, crisp hats",
+  "bass": "808-inspired bass",
+  "harmony": "minimal atmospheric loops",
+  "arrangement": "beat intro, verse focus, hook",
+  "positive": ["contemporary hip-hop beat", "space for rap or sung hook"],
+  "negative": ["orchestral waltz", "heavy metal guitars"]
+}

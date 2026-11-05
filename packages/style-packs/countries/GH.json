@@ -1,0 +1,25 @@
+{
+  "code": "GH",
+  "name": "Ghana",
+  "default_genres": ["afrobeats", "highlife", "afrosoul", "hiphop"],
+  "default_language_mix": "nigerian_english",
+  "accent": {
+    "positive": [
+      "Ghanaian English vocal delivery",
+      "natural Accra speech rhythm",
+      "warm mid-range lead vocal",
+      "human breath and natural timing"
+    ],
+    "negative": [
+      "American pop vocal",
+      "robotic TTS",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "highlife guitar patterns",
+    "syncopated percussion",
+    "warm keys"
+  ],
+  "prompt_prefix": "Ghanaian contemporary song performance"
+}

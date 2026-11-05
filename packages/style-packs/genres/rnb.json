@@ -1,0 +1,12 @@
+{
+  "id": "rnb",
+  "bpm_range": [70, 100],
+  "default_bpm": 85,
+  "energy_default": 2,
+  "drums": "smooth R&B drums, soft snare",
+  "bass": "silky bass line",
+  "harmony": "lush chords, romantic pads",
+  "arrangement": "verse, pre-chorus, silky chorus",
+  "positive": ["modern R&B groove", "smooth vocal performance"],
+  "negative": ["aggressive punk", "generic EDM drop"]
+}

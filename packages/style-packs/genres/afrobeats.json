@@ -1,0 +1,21 @@
+{
+  "id": "afrobeats",
+  "bpm_range": [100, 115],
+  "default_bpm": 108,
+  "energy_default": 4,
+  "drums": "syncopated percussion, shakers, tight snare, punchy bass drum patterns common in Afrobeats",
+  "bass": "melodic bass with log-drum-like punches where appropriate",
+  "harmony": "bright major/minor hooks, catchy repetitive chorus",
+  "arrangement": "intro percussion → verse → big chorus → optional bridge → final chorus",
+  "positive": [
+    "danceable Afrobeats groove",
+    "call and response friendly chorus",
+    "club-ready but clean mix"
+  ],
+  "negative": [
+    "generic EDM drop",
+    "trap hi-hat only US drill kit",
+    "country music banjo",
+    "heavy metal guitars"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "code": "GB",
+  "name": "United Kingdom",
+  "default_genres": ["pop", "hiphop", "rnb", "afrobeats"],
+  "default_language_mix": null,
+  "accent": {
+    "positive": [
+      "British English vocal delivery",
+      "contemporary UK pop or UK garage-adjacent phrasing when fitting",
+      "clear lead vocal"
+    ],
+    "negative": [
+      "robotic TTS",
+      "forced caricature accent",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "modern UK drums",
+    "bass-forward groove",
+    "clean mix"
+  ],
+  "prompt_prefix": "British contemporary song performance"
+}

@@ -1,0 +1,24 @@
+{
+  "code": "ZA",
+  "name": "South Africa",
+  "default_genres": ["amapiano", "afrosoul", "hiphop", "gospel"],
+  "default_language_mix": "nigerian_english",
+  "accent": {
+    "positive": [
+      "South African English vocal delivery",
+      "natural Johannesburg speech rhythm",
+      "smooth mid-range lead vocal"
+    ],
+    "negative": [
+      "American pop vocal",
+      "robotic TTS",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "log drum groove",
+    "wide piano chords",
+    "airy pads"
+  ],
+  "prompt_prefix": "South African contemporary song performance"
+}

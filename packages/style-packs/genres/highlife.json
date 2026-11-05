@@ -1,0 +1,12 @@
+{
+  "id": "highlife",
+  "bpm_range": [95, 120],
+  "default_bpm": 108,
+  "energy_default": 3,
+  "drums": "swinging highlife percussion, light snare, lively shakers",
+  "bass": "melodic walking bass",
+  "harmony": "bright guitar-led chords, joyful major colors",
+  "arrangement": "guitar intro, verse, uplifting chorus",
+  "positive": ["classic highlife feel", "joyful danceable guitar"],
+  "negative": ["trap-only kit", "generic EDM drop"]
+}

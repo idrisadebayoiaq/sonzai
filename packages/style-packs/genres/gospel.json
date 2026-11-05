@@ -1,0 +1,12 @@
+{
+  "id": "gospel",
+  "bpm_range": [70, 110],
+  "default_bpm": 88,
+  "energy_default": 3,
+  "drums": "uplifting gospel drums, handclaps optional",
+  "bass": "supportive warm bass",
+  "harmony": "rich chords, choir-ready lifts",
+  "arrangement": "verse, call-and-response chorus, choir swell",
+  "positive": ["inspirational gospel energy", "choir-friendly chorus"],
+  "negative": ["dark industrial techno", "horror sound design"]
+}

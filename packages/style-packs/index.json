@@ -1,0 +1,30 @@
+{
+  "countries": ["NG", "GH", "KE", "ZA", "US", "GB"],
+  "genres": [
+    "afrobeats",
+    "amapiano",
+    "highlife",
+    "afrosoul",
+    "hiphop",
+    "rnb",
+    "pop",
+    "gospel"
+  ],
+  "song_types": [
+    "full_song",
+    "hook",
+    "dance_track",
+    "ballad",
+    "freestyle",
+    "gospel"
+  ],
+  "language_mixes": {
+    "NG": [
+      "nigerian_english",
+      "nigerian_english_pidgin",
+      "yoruba_english",
+      "igbo_english",
+      "hausa_english"
+    ]
+  }
+}

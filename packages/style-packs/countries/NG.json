@@ -1,0 +1,29 @@
+{
+  "code": "NG",
+  "name": "Nigeria",
+  "default_genres": ["afrobeats", "afrosoul", "highlife", "hiphop", "gospel"],
+  "default_language_mix": "nigerian_english_pidgin",
+  "accent": {
+    "positive": [
+      "Nigerian English vocal delivery",
+      "natural Lagos speech rhythm",
+      "warm mid-range lead vocal",
+      "optional Nigerian Pidgin ad-libs",
+      "human imperfections, breath, slight rasp allowed"
+    ],
+    "negative": [
+      "American pop vocal",
+      "Mid-Atlantic accent",
+      "British RP announcer voice",
+      "robotic TTS",
+      "over-autotuned chipmunk effect"
+    ]
+  },
+  "cultural_instruments_hint": [
+    "syncopated percussion",
+    "talking-drum inspired fills (tasteful)",
+    "bright guitar plucks",
+    "warm synth keys"
+  ],
+  "prompt_prefix": "Nigerian contemporary song performance"
+}

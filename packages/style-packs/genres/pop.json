@@ -1,0 +1,12 @@
+{
+  "id": "pop",
+  "bpm_range": [100, 128],
+  "default_bpm": 118,
+  "energy_default": 3,
+  "drums": "polished pop drums",
+  "bass": "tight pop bass",
+  "harmony": "catchy chord progressions",
+  "arrangement": "radio-friendly verse chorus structure",
+  "positive": ["contemporary pop production", "catchy hook"],
+  "negative": ["lo-fi mud", "harsh clipping"]
+}
