@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { createJob, getProfile, uploadVoiceSample } from "@/lib/api";
-import { COUNTRIES, GENRES, LANGUAGE_MIXES, MOODS, SONG_TYPES, VOCAL_STYLES } from "@/lib/options";
+import { COUNTRIES, GENRES, KEYS, LANGUAGE_MIXES, LYRIC_SECTIONS, MOODS, SONG_TYPES, TIME_SIGNATURES, VOCAL_GENDERS, VOCAL_STYLES } from "@/lib/options";
+import { estimateDurationSec, formatDuration, LENGTH_PRESETS } from "@/lib/songLength";
 
 export default function DashboardCreatePage() {
   const router = useRouter();
@@ -20,6 +21,15 @@ export default function DashboardCreatePage() {
   const [vocalStyle, setVocalStyle] = useState("energetic");
   const [bpm, setBpm] = useState("");
   const [energy, setEnergy] = useState(3);
+  const [mode, setMode] = useState<"custom" | "simple">("custom");
+  const [length, setLength] = useState("auto");
+  const [stylePrompt, setStylePrompt] = useState("");
+  const [instrumental, setInstrumental] = useState(false);
+  const [vocalGender, setVocalGender] = useState("auto");
+  const [keyScale, setKeyScale] = useState("");
+  const [timeSignature, setTimeSignature] = useState("");
+  const [negativeStyle, setNegativeStyle] = useState("");
+  const [weirdness, setWeirdness] = useState(3);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
@@ -28,6 +38,12 @@ export default function DashboardCreatePage() {
 
   const langOptions = useMemo(() => LANGUAGE_MIXES[country] || [], [country]);
   const countryName = COUNTRIES.find((c) => c.code === country)?.name ?? country;
+  const plannedSeconds = estimateDurationSec({
+    lyrics: mode === "simple" ? stylePrompt : lyrics,
+    songType,
+    bpm: bpm ? Number(bpm) : null,
+    length,
+  });
 
   useEffect(() => {
     if (langOptions.length) setLanguageMix(langOptions[0].id);
@@ -43,6 +59,14 @@ export default function DashboardCreatePage() {
     e.preventDefault();
     if (!token) {
       setError("Sign in required.");
+      return;
+    }
+    if (mode === "custom" && lyrics.trim().length < 8 && !instrumental) {
+      setError("Paste the full lyrics (at least a few lines), or switch to Describe mode.");
+      return;
+    }
+    if (mode === "simple" && stylePrompt.trim().length < 8) {
+      setError("Describe the song you want — genre, story, and mood.");
       return;
     }
     if (voiceFile && !consent) {
@@ -72,6 +96,18 @@ export default function DashboardCreatePage() {
         bpm: bpm ? Number(bpm) : null,
         energy,
         voice_sample_path,
+        options: {
+          mode,
+          length,
+          style_prompt: stylePrompt.trim(),
+          instrumental,
+          vocal_gender: vocalGender,
+          key_scale: keyScale,
+          time_signature: timeSignature,
+          negative_style: negativeStyle.trim(),
+          temperature: 0.65 + weirdness * 0.1,
+          vocal_language: "en",
+        },
       });
       router.push(`/dashboard/jobs/${job_id}`);
     } catch (err) {
@@ -93,6 +129,24 @@ export default function DashboardCreatePage() {
 
       <div className="grid items-start gap-8 xl:grid-cols-[1.35fr_0.85fr]">
         <form onSubmit={onSubmit} className="panel space-y-6 p-6 md:p-8">
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["custom", "Custom lyrics"],
+                ["simple", "Describe a song"],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMode(id)}
+                className={mode === id ? "btn-primary !px-4 !py-2 text-sm" : "btn-ghost !px-4 !py-2 text-sm"}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <label className="field block text-sm">
             <span className="mb-2 block text-[var(--muted)]">Title</span>
             <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Lagos Nights" />
@@ -173,6 +227,16 @@ export default function DashboardCreatePage() {
               />
             </label>
             <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Length</span>
+              <select value={length} onChange={(e) => setLength(e.target.value)}>
+                {LENGTH_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>
+                    {preset.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field block text-sm">
               <span className="mb-2 block text-[var(--muted)]">Energy ({energy}/5)</span>
               <input
                 type="range"
@@ -186,15 +250,113 @@ export default function DashboardCreatePage() {
           </div>
 
           <label className="field block text-sm">
-            <span className="mb-2 block text-[var(--muted)]">Lyrics (sung by the model)</span>
+            <span className="mb-2 block text-[var(--muted)]">
+              {mode === "simple" ? "Describe the song" : "Style of music (optional)"}
+            </span>
             <textarea
-              required
-              minLength={8}
+              value={stylePrompt}
+              onChange={(e) => setStylePrompt(e.target.value)}
+              className="min-h-24 resize-y"
+              placeholder="Uplifting Lagos gospel, live drums, choir stacks, female lead, call and response"
+            />
+          </label>
+
+          <label className="field block text-sm">
+            <span className="mb-2 flex items-center justify-between text-[var(--muted)]">
+              <span>{instrumental ? "Arrangement notes" : "Full lyrics"}</span>
+              <span>{formatDuration(plannedSeconds)} target</span>
+            </span>
+            {mode === "custom" && (
+              <div className="mb-2 flex flex-wrap gap-2">
+                {LYRIC_SECTIONS.map((section) => (
+                  <button
+                    key={section}
+                    type="button"
+                    className="rounded-full border border-[var(--line)] px-2.5 py-1 text-xs text-[var(--muted)] hover:text-[var(--fg)]"
+                    onClick={() =>
+                      setLyrics((prev) => `${prev}${prev && !prev.endsWith("\n") ? "\n\n" : ""}[${section}]\n`)
+                    }
+                  >
+                    [{section}]
+                  </button>
+                ))}
+              </div>
+            )}
+            <textarea
+              required={mode === "custom" && !instrumental}
+              minLength={mode === "custom" && !instrumental ? 8 : undefined}
               value={lyrics}
               onChange={(e) => setLyrics(e.target.value)}
-              className="min-h-48 resize-y"
-              placeholder={"[Verse 1]\n...\n\n[Chorus]\n..."}
+              className="min-h-56 resize-y"
+              placeholder={
+                mode === "simple"
+                  ? "Optional: paste lyrics, or leave blank and let AceMusic write them from the description."
+                  : "[Verse 1]\n...\n\n[Chorus]\n..."
+              }
             />
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Vocal gender</span>
+              <select value={vocalGender} onChange={(e) => setVocalGender(e.target.value)}>
+                {VOCAL_GENDERS.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Key</span>
+              <select value={keyScale} onChange={(e) => setKeyScale(e.target.value)}>
+                {KEYS.map((key) => (
+                  <option key={key || "auto"} value={key}>
+                    {key || "Auto"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Time signature</span>
+              <select value={timeSignature} onChange={(e) => setTimeSignature(e.target.value)}>
+                {TIME_SIGNATURES.map((sig) => (
+                  <option key={sig || "auto"} value={sig}>
+                    {sig || "Auto"}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Creativity ({weirdness}/5)</span>
+              <input
+                type="range"
+                min={1}
+                max={5}
+                value={weirdness}
+                onChange={(e) => setWeirdness(Number(e.target.value))}
+                className="w-full accent-[var(--accent)]"
+              />
+            </label>
+          </div>
+
+          <label className="field block text-sm">
+            <span className="mb-2 block text-[var(--muted)]">Exclude (optional)</span>
+            <input
+              value={negativeStyle}
+              onChange={(e) => setNegativeStyle(e.target.value)}
+              placeholder="no trap hi-hats, no autotune, no English rap"
+            />
+          </label>
+
+          <label className="flex items-start gap-3 text-sm text-[var(--muted)]">
+            <input
+              type="checkbox"
+              checked={instrumental}
+              onChange={(e) => setInstrumental(e.target.checked)}
+              className="mt-1 accent-[var(--accent)]"
+            />
+            <span>Instrumental only — no sung vocals</span>
           </label>
 
           <div className="space-y-3 rounded-xl border border-[var(--line)] bg-black/15 p-4">
@@ -240,13 +402,15 @@ export default function DashboardCreatePage() {
             <Row label="Type" value={SONG_TYPES.find((s) => s.id === songType)?.label ?? songType} />
             <Row label="Mood" value={mood} />
             <Row label="Vocal" value={vocalStyle} />
+            <Row label="Length" value={formatDuration(plannedSeconds)} />
+            <Row label="Mode" value={mode === "simple" ? "Describe" : "Custom lyrics"} />
             <Row label="Energy" value={`${energy}/5`} />
             {bpm && <Row label="BPM" value={bpm} />}
             <Row label="Engine" value="AceMusic ACE-Step" />
           </dl>
           <p className="border-t border-[var(--line)] pt-4 text-sm leading-relaxed text-[var(--muted)]">
-            Generation usually takes 1–3 minutes. Stay on the job page while AceMusic builds vocals and arrangement from
-            your lyrics.
+            Length follows your full lyric sheet (up to 4 minutes), with intro and outro. Longer songs can take a few
+            minutes. Stay on the job page until AceMusic finishes.
           </p>
         </aside>
       </div>

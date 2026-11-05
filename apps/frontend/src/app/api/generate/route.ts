@@ -1,33 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateWithAceMusic, maybeNormalizeMp3 } from "@/lib/acemusic";
+import { estimateDurationSec } from "@/lib/songLength";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-const DURATION: Record<string, number> = {
-  hook: 30,
-  freestyle: 45,
-  dance_track: 60,
-  full_song: 60,
-  ballad: 60,
-  gospel: 60,
-};
-
 function buildPrompt(job: Record<string, unknown>) {
+  const options = (job.options || {}) as Record<string, unknown>;
   const energy = Number(job.energy || 3);
   const energyWord = energy >= 4 ? "high energy" : energy <= 2 ? "mellow low energy" : "medium energy";
+  const gender = String(options.vocal_gender || "auto");
+  const genderLine =
+    gender === "female"
+      ? "female lead vocal"
+      : gender === "male"
+        ? "male lead vocal"
+        : gender === "duet"
+          ? "male and female duet vocals"
+          : "";
   const parts = [
     `${job.country} contemporary song with authentic regional feel`,
     String(job.genre || ""),
     String(job.mood || "") + " mood",
     `${job.vocal_style || "natural"} vocal style`,
+    genderLine,
     String(job.language_mix || ""),
+    String(options.style_prompt || ""),
     energyWord,
     job.bpm ? `BPM ${job.bpm}` : "",
+    options.key_scale ? `key ${options.key_scale}` : "",
+    options.time_signature ? `time signature ${options.time_signature}` : "",
     `song type ${job.song_type}`,
-    "sing the provided lyrics clearly with natural human vocals",
-    "coherent melody, full arrangement, studio quality mix",
+    options.negative_style ? `avoid: ${options.negative_style}` : "",
+    options.instrumental
+      ? "instrumental only, no vocals"
+      : "sing every lyric line in order from start to finish, do not skip verses or the chorus, complete arrangement with intro and outro",
+    "coherent melody, studio quality mix",
   ];
   return parts.filter(Boolean).join(", ");
 }
@@ -100,9 +109,17 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", job_id);
 
+    const options = (job.options || {}) as Record<string, unknown>;
+    const sampleMode = options.mode === "simple";
     const prompt = buildPrompt(job);
-    const durationSec = DURATION[job.song_type] || 60;
-    const bpm = job.bpm || 108;
+    const durationSec = estimateDurationSec({
+      lyrics: sampleMode ? String(options.style_prompt || job.title || "") : job.lyrics,
+      songType: job.song_type,
+      bpm: job.bpm,
+      length: String(options.length || "auto"),
+    });
+    const bpm = job.bpm || null;
+    const temperature = Number(options.temperature ?? 0.85);
 
     let mp3: Buffer;
     let duration: number;
@@ -112,6 +129,12 @@ export async function POST(req: NextRequest) {
         prompt,
         bpm,
         durationSec,
+        instrumental: Boolean(options.instrumental),
+        vocalLanguage: String(options.vocal_language || "en"),
+        keyScale: String(options.key_scale || ""),
+        timeSignature: String(options.time_signature || ""),
+        temperature: Number.isFinite(temperature) ? temperature : 0.85,
+        sampleMode,
       });
       mp3 = maybeNormalizeMp3(result.mp3);
       duration = result.duration;
@@ -165,6 +188,7 @@ export async function POST(req: NextRequest) {
           demo_mode: false,
           prompt,
           bpm,
+          duration_sec: duration,
           tags: [job.country, job.genre, job.song_type, job.mood],
         },
       })

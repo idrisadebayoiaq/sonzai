@@ -44,6 +44,19 @@ export const LANGUAGE_MIXES: Record<string, { id: string; label: string }[]> = {
 
 export const VOCAL_STYLES = ["soft", "energetic", "raspy", "choir"];
 
+export const VOCAL_GENDERS = [
+  { id: "auto", label: "Auto" },
+  { id: "female", label: "Female lead" },
+  { id: "male", label: "Male lead" },
+  { id: "duet", label: "Duet" },
+];
+
+export const KEYS = ["", "C major", "G major", "D major", "A major", "F major", "A minor", "E minor", "D minor"];
+
+export const TIME_SIGNATURES = ["", "4/4", "3/4", "6/8", "2/4"];
+
+export const LYRIC_SECTIONS = ["Intro", "Verse 1", "Pre-Chorus", "Chorus", "Verse 2", "Bridge", "Outro", "Instrumental"];
+
 export const STAGE_LABELS: Record<string, string> = {
   queued: "Queued",
   composing: "Building style",

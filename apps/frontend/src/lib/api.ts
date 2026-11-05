@@ -12,6 +12,7 @@ export type CreateJobPayload = {
   title?: string;
   voice_sample_path?: string | null;
   energy?: number | null;
+  options?: Record<string, unknown>;
 };
 
 async function requireUser() {
@@ -91,6 +92,7 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
       title: payload.title || "Untitled",
       voice_sample_path: payload.voice_sample_path ?? null,
       energy: payload.energy ?? null,
+      options: payload.options ?? {},
       progress: 5,
     })
     .select("id, status")
