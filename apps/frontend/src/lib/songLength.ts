@@ -1,5 +1,5 @@
-/** ACE-Step supports 10–600s. We cap at 4 minutes so a Vercel function can finish. */
-export const MAX_SONG_SECONDS = 240;
+/** ACE-Step supports 10–600s. Longest Sonzai track is 6 minutes. */
+export const MAX_SONG_SECONDS = 360;
 
 export const LENGTH_PRESETS = [
   { id: "auto", label: "Auto — fit the full lyrics" },
@@ -7,6 +7,7 @@ export const LENGTH_PRESETS = [
   { id: "120", label: "2 minutes" },
   { id: "180", label: "3 minutes" },
   { id: "240", label: "4 minutes" },
+  { id: "360", label: "6 minutes" },
 ] as const;
 
 export function estimateDurationSec(input: {

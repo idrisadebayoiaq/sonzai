@@ -409,7 +409,7 @@ export default function DashboardCreatePage() {
             <Row label="Engine" value="AceMusic ACE-Step" />
           </dl>
           <p className="border-t border-[var(--line)] pt-4 text-sm leading-relaxed text-[var(--muted)]">
-            Length follows your full lyric sheet (up to 4 minutes), with intro and outro. Longer songs can take a few
+            Length follows your full lyric sheet (up to 6 minutes), with intro and outro. Longer songs can take a few
             minutes. Stay on the job page until AceMusic finishes.
           </p>
         </aside>

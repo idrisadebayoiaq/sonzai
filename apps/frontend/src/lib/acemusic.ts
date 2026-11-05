@@ -32,7 +32,7 @@ export async function generateWithAceMusic(input: GenInput): Promise<{ mp3: Buff
   const model = process.env.ACEMUSIC_MODEL || "acemusic/acestep-v1.5-turbo";
   // Ignore a low ACEMUSIC_MAX_DURATION (older deploys used 60–90s). Full songs need room for every lyric line.
   const envCap = Number(process.env.ACEMUSIC_MAX_DURATION || 0);
-  const maxDur = Math.min(600, Math.max(envCap || 0, 240));
+  const maxDur = Math.min(600, Math.max(envCap || 0, 360));
   const duration = Math.max(15, Math.min(input.durationSec, maxDur));
   const instrumental = Boolean(input.instrumental);
   const sampleMode = Boolean(input.sampleMode);

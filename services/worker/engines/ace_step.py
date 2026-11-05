@@ -41,7 +41,7 @@ def _timeout() -> float:
 
 
 def _max_duration() -> int:
-    return max(240, int(os.getenv("ACEMUSIC_MAX_DURATION", "240")))
+    return max(360, int(os.getenv("ACEMUSIC_MAX_DURATION", "360")))
 
 
 def is_configured() -> bool:
