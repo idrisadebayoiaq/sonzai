@@ -168,6 +168,15 @@ button {
   color: var(--fg);
 }
 
+input.field,
+select.field {
+  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  background: rgba(21, 28, 24, 0.9);
+  color: var(--fg);
+  padding: 0.45rem 0.7rem;
+}
+
 .btn-primary {
   display: inline-flex;
   align-items: center;

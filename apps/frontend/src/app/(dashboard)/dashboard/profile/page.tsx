@@ -111,11 +111,7 @@ export default function DashboardProfilePage() {
     <div className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Profile</p>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">User profile</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Full create / read / update / delete controls for your public-facing creator profile. Email is managed by
-          Supabase Auth and is not editable here.
-        </p>
+        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Profile</h1>
       </div>
 
       <section className="grid gap-4 sm:grid-cols-3">
@@ -212,10 +208,6 @@ export default function DashboardProfilePage() {
         </div>
         <div className="panel space-y-4 p-5">
           <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Delete</h3>
-          <p className="text-sm leading-relaxed text-[var(--muted)]">
-            Soft-delete clears display fields and signs you out. For full auth account deletion, contact support or use
-            Supabase dashboard — that action is irreversible.
-          </p>
           <button type="button" className="btn-ghost border-[var(--danger)] text-[var(--danger)]" onClick={onSoftDelete}>
             Soft-delete profile & sign out
           </button>

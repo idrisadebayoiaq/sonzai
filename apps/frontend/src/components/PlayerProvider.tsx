@@ -8,7 +8,12 @@ export type PlayableSong = {
   url: string;
   subtitle?: string;
   tags?: string[];
+  lyrics?: string | null;
+  cropStart?: number | null;
+  cropEnd?: number | null;
 };
+
+type RepeatMode = "off" | "all" | "one";
 
 type PlayerContextValue = {
   queue: PlayableSong[];
@@ -23,6 +28,10 @@ type PlayerContextValue = {
   prev: () => void;
   seek: (seconds: number) => void;
   setVolume: (value: number) => void;
+  shuffle: boolean;
+  repeat: RepeatMode;
+  toggleShuffle: () => void;
+  cycleRepeat: () => void;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -35,11 +44,17 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(0.9);
+  const [shuffle, setShuffle] = useState(false);
+  const [repeat, setRepeat] = useState<RepeatMode>("off");
   const queueRef = useRef(queue);
   const indexRef = useRef(index);
   const loadedUrl = useRef("");
+  const repeatRef = useRef(repeat);
+  const shuffleRef = useRef(shuffle);
   queueRef.current = queue;
   indexRef.current = index;
+  repeatRef.current = repeat;
+  shuffleRef.current = shuffle;
 
   const current = queue[index] ?? null;
 
@@ -47,14 +62,39 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     const audio = new Audio();
     audio.preload = "metadata";
     audioRef.current = audio;
-    const onTime = () => setCurrentTime(audio.currentTime || 0);
+    const onTime = () => {
+      const song = queueRef.current[indexRef.current];
+      const time = audio.currentTime || 0;
+      if (song?.cropEnd && time >= song.cropEnd) {
+        audio.dispatchEvent(new Event("ended"));
+        return;
+      }
+      setCurrentTime(time);
+    };
     const onMeta = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onEnded = () => {
+      const list = queueRef.current;
       const i = indexRef.current;
-      if (i + 1 < queueRef.current.length) setIndex(i + 1);
-      else setPlaying(false);
+      if (repeatRef.current === "one") {
+        const song = list[i];
+        audio.currentTime = song?.cropStart || 0;
+        audio.play().catch(() => setPlaying(false));
+        return;
+      }
+      if (shuffleRef.current && list.length > 1) {
+        let nextIndex = i;
+        while (nextIndex === i) nextIndex = Math.floor(Math.random() * list.length);
+        setIndex(nextIndex);
+        return;
+      }
+      if (i + 1 < list.length) setIndex(i + 1);
+      else if (repeatRef.current === "all" && list.length) setIndex(0);
+      else {
+        audio.pause();
+        setPlaying(false);
+      }
     };
     audio.addEventListener("timeupdate", onTime);
     audio.addEventListener("loadedmetadata", onMeta);
@@ -80,7 +120,8 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (loadedUrl.current !== song.url) {
       loadedUrl.current = song.url;
       audio.src = song.url;
-      setCurrentTime(0);
+      audio.currentTime = song.cropStart || 0;
+      setCurrentTime(song.cropStart || 0);
       setDuration(0);
     }
     audio.volume = volume;
@@ -128,9 +169,31 @@ export function PlayerProvider({ children }: { children: React.ReactNode }) {
     if (audioRef.current) audioRef.current.volume = nextVolume;
   }, []);
 
+  const toggleShuffle = useCallback(() => setShuffle((value) => !value), []);
+  const cycleRepeat = useCallback(() => {
+    setRepeat((value) => (value === "off" ? "all" : value === "all" ? "one" : "off"));
+  }, []);
+
   const value = useMemo(
-    () => ({ queue, current, playing, currentTime, duration, volume, playSong, toggle, next, prev, seek, setVolume }),
-    [queue, current, playing, currentTime, duration, volume, playSong, toggle, next, prev, seek, setVolume],
+    () => ({
+      queue,
+      current,
+      playing,
+      currentTime,
+      duration,
+      volume,
+      playSong,
+      toggle,
+      next,
+      prev,
+      seek,
+      setVolume,
+      shuffle,
+      repeat,
+      toggleShuffle,
+      cycleRepeat,
+    }),
+    [queue, current, playing, currentTime, duration, volume, playSong, toggle, next, prev, seek, setVolume, shuffle, repeat, toggleShuffle, cycleRepeat],
   );
 
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;

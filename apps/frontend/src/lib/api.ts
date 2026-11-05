@@ -182,7 +182,6 @@ export async function deleteSong(songId: string, storagePath: string) {
 
 export async function deleteProfile() {
   const { supabase, user } = await requireUser();
-  // Soft-clear profile fields; full auth delete requires service role
   const { error } = await supabase
     .from("profiles")
     .update({
@@ -195,4 +194,103 @@ export async function deleteProfile() {
     .eq("id", user.id);
   if (error) throw new Error(error.message);
   await supabase.auth.signOut();
+}
+
+export async function updateSong(
+  songId: string,
+  patch: { visibility?: "private" | "public"; crop_start?: number | null; crop_end?: number | null; title?: string },
+) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("songs").update(patch).eq("id", songId);
+  if (error) throw new Error(error.message);
+}
+
+export async function listPlaylists() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("playlists").select("id,name,created_at").order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function createPlaylist(name: string) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("playlists").insert({ user_id: user.id, name }).select("id,name").single();
+  if (error) throw new Error(error.message);
+  return data;
+}
+
+export async function addSongToPlaylist(playlistId: string, songId: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("playlist_songs").upsert({ playlist_id: playlistId, song_id: songId, position: 0 });
+  if (error) throw new Error(error.message);
+}
+
+export async function listPlaylistSongs(playlistId: string) {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase
+    .from("playlist_songs")
+    .select("position, songs(*)")
+    .eq("playlist_id", playlistId)
+    .order("position");
+  if (error) throw new Error(error.message);
+  const songs = [];
+  for (const row of data || []) {
+    const song = Array.isArray(row.songs) ? row.songs[0] : row.songs;
+    if (!song) continue;
+    songs.push({ ...song, signed_url: await signedSongUrl(song.storage_path) });
+  }
+  return songs;
+}
+
+export async function listPrompts() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("saved_prompts").select("id,name,body").order("created_at", { ascending: false }).limit(30);
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function savePrompt(name: string, body: string) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("saved_prompts").insert({ user_id: user.id, name, body });
+  if (error) throw new Error(error.message);
+}
+
+export async function listVoices() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("voice_profiles").select("id,name,sample_path,created_at").order("created_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  return data || [];
+}
+
+export async function saveVoiceProfile(name: string, samplePath: string) {
+  const { supabase, user } = await requireUser();
+  const { error } = await supabase.from("voice_profiles").insert({
+    user_id: user.id,
+    name,
+    sample_path: samplePath,
+    consent_accepted: true,
+  });
+  if (error) throw new Error(error.message);
+}
+
+export async function deleteVoice(id: string) {
+  const { supabase } = await requireUser();
+  const { error } = await supabase.from("voice_profiles").delete().eq("id", id);
+  if (error) throw new Error(error.message);
+}
+
+export type PublicSong = {
+  id: string;
+  title: string;
+  signed_url: string | null;
+  lyrics?: string | null;
+  meta?: { tags?: string[] };
+  duration_sec?: number | null;
+};
+
+export async function listPublicSongs() {
+  const response = await fetch("/api/explore");
+  const body = await response.json();
+  if (!response.ok) throw new Error(body.error || "Could not load explore");
+  return (body.songs || []) as PublicSong[];
 }

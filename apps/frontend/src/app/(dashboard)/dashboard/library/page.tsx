@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { deleteSong, listSongs } from "@/lib/api";
+import { deleteSong, listPlaylistSongs, listPlaylists, listSongs } from "@/lib/api";
 import { SongCover } from "@/components/PlayerBar";
+import { SongTools } from "@/components/SongTools";
 import { formatPlayback, usePlayer } from "@/components/PlayerProvider";
 
 type Song = {
@@ -13,6 +14,10 @@ type Song = {
   signed_url?: string | null;
   duration_sec?: number | null;
   created_at?: string;
+  lyrics?: string | null;
+  visibility?: string | null;
+  crop_start?: number | null;
+  crop_end?: number | null;
   meta?: {
     demo_mode?: boolean;
     tags?: string[];
@@ -27,14 +32,29 @@ export default function DashboardLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [playlistId, setPlaylistId] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [playlists, setPlaylists] = useState<{ id: string; name: string }[]>([]);
   const player = usePlayer();
 
   useEffect(() => {
-    listSongs()
-      .then(setSongs)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load songs"))
-      .finally(() => setLoading(false));
+    listPlaylists().then(setPlaylists).catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    if (!playlistId) {
+      listSongs()
+        .then(setSongs)
+        .catch((err) => setError(err instanceof Error ? err.message : "Failed to load songs"))
+        .finally(() => setLoading(false));
+      return;
+    }
+    setLoading(true);
+    listPlaylistSongs(playlistId)
+      .then(setSongs)
+      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load playlist"))
+      .finally(() => setLoading(false));
+  }, [playlistId, reloadKey]);
 
   async function onDelete(song: Song) {
     if (!song.storage_path) return;
@@ -65,6 +85,9 @@ export default function DashboardLibraryPage() {
       url: song.signed_url as string,
       subtitle: (song.meta?.tags || []).filter(Boolean).slice(0, 3).join(" · "),
       tags: (song.meta?.tags || []).map(String),
+      lyrics: song.lyrics,
+      cropStart: song.crop_start,
+      cropEnd: song.crop_end,
     }));
 
   return (
@@ -73,10 +96,7 @@ export default function DashboardLibraryPage() {
         <div>
           <p className="text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Library</p>
           <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Your songs</h1>
-          <p className="mt-3 max-w-xl text-[var(--muted)]">
-            Every completed AceMusic generation lands here. Play, download via browser controls, or delete tracks you no
-            longer need.
-          </p>
+          <p className="mt-2 text-sm text-[var(--muted)]">Your tracks.</p>
         </div>
         <Link href="/dashboard/create" className="btn-primary shrink-0">
           New song
@@ -102,10 +122,23 @@ export default function DashboardLibraryPage() {
         </div>
       </section>
 
-      <label className="field block max-w-md text-sm">
-        <span className="mb-2 block text-[var(--muted)]">Search title or tags</span>
-        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="afrobeats, NG, ballad…" />
-      </label>
+      <div className="flex flex-wrap gap-3">
+        <label className="field block max-w-md flex-1 text-sm">
+          <span className="mb-2 block text-[var(--muted)]">Search</span>
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Title or tag" />
+        </label>
+        <label className="field block text-sm">
+          <span className="mb-2 block text-[var(--muted)]">Playlist</span>
+          <select value={playlistId} onChange={(event) => setPlaylistId(event.target.value)}>
+            <option value="">All songs</option>
+            {playlists.map((playlist) => (
+              <option key={playlist.id} value={playlist.id}>
+                {playlist.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
 
       {loading && <p className="text-[var(--muted)]">Loading library…</p>}
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
@@ -129,11 +162,14 @@ export default function DashboardLibraryPage() {
                           id: song.id,
                           title: song.title,
                           url: song.signed_url,
-                          subtitle: (song.meta?.tags || []).filter(Boolean).slice(0, 3).join(" · "),
-                          tags: (song.meta?.tags || []).map(String),
-                        },
-                        playable,
-                      );
+          subtitle: (song.meta?.tags || []).filter(Boolean).slice(0, 3).join(" · "),
+          tags: (song.meta?.tags || []).map(String),
+          lyrics: song.lyrics,
+          cropStart: song.crop_start,
+          cropEnd: song.crop_end,
+        },
+        playable,
+      );
                   }}
                 >
                   <SongCover title={song.title} className="h-full w-full rounded-xl" />
@@ -174,36 +210,12 @@ export default function DashboardLibraryPage() {
                   </button>
                 </div>
               </div>
+              <SongTools song={song} onChange={() => setReloadKey((value) => value + 1)} />
             </li>
           );
         })}
       </ul>
-
-      {!loading && !error && filtered.length === 0 && (
-        <div className="panel p-8 text-center">
-          <p className="text-[var(--muted)]">{songs.length ? "No matches." : "No songs yet."}</p>
-          <Link href="/dashboard/create" className="btn-primary mt-5 inline-flex">
-            Create your first track
-          </Link>
-        </div>
-      )}
-
-      <section className="grid gap-4 lg:grid-cols-2">
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Storage & privacy</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Audio is stored in your private Supabase bucket under your user id. Signed URLs expire after one hour —
-            refresh this page to renew playback links.
-          </p>
-        </div>
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Demo vs real</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Older “demo” tracks were tone placeholders before AceMusic was wired. New generations use engine
-            <code className="mx-1 text-[var(--accent)]">acemusic</code> and sing your lyrics.
-          </p>
-        </div>
-      </section>
+      {!loading && !error && filtered.length === 0 && <p className="text-sm text-[var(--muted)]">No songs.</p>}
     </div>
   );
 }

@@ -91,6 +91,29 @@ export const TIME_SIGNATURES = ["", "4/4", "3/4", "6/8", "2/4"];
 
 export const LYRIC_SECTIONS = ["Intro", "Verse 1", "Pre-Chorus", "Chorus", "Verse 2", "Bridge", "Outro", "Instrumental"];
 
+export const STRUCTURE_PRESETS = [
+  {
+    id: "pop",
+    label: "Pop",
+    text: "[Intro]\n\n[Verse 1]\n\n[Pre-Chorus]\n\n[Chorus]\n\n[Verse 2]\n\n[Chorus]\n\n[Bridge]\n\n[Chorus]\n\n[Outro]\n",
+  },
+  {
+    id: "rap",
+    label: "Rap",
+    text: "[Intro]\n\n[Verse 1]\n\n[Hook]\n\n[Verse 2]\n\n[Hook]\n\n[Verse 3]\n\n[Hook]\n\n[Outro]\n",
+  },
+  {
+    id: "ballad",
+    label: "Ballad",
+    text: "[Intro]\n\n[Verse 1]\n\n[Chorus]\n\n[Verse 2]\n\n[Chorus]\n\n[Bridge]\n\n[Chorus]\n\n[Outro]\n",
+  },
+  {
+    id: "dance",
+    label: "Dance",
+    text: "[Intro]\n\n[Verse]\n\n[Build]\n\n[Drop]\n\n[Verse]\n\n[Drop]\n\n[Outro]\n",
+  },
+];
+
 export const STAGE_LABELS: Record<string, string> = {
   queued: "Queued",
   composing: "Building style",

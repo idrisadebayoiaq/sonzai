@@ -96,11 +96,7 @@ export default function DashboardSettingsPage() {
     <div className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Settings</p>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Account & studio settings</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Manage authentication, credit visibility, generation preferences, and session controls. Generation always uses
-          AceMusic when the server key is configured — there is no demo fallback in production.
-        </p>
+        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Settings</h1>
       </div>
 
       {message && <p className="text-sm text-[var(--accent-2)]">{message}</p>}
@@ -198,28 +194,6 @@ export default function DashboardSettingsPage() {
         <button type="button" className="btn-ghost" onClick={savePrefs}>
           Save preferences
         </button>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Generation policy</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            DEMO_MODE is off. If AceMusic is unavailable, jobs fail loudly instead of returning unrelated beep audio.
-          </p>
-        </div>
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Voice samples</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Optional uploads go to your private voice-samples bucket. Only upload voices you own or have rights to use.
-          </p>
-        </div>
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Data export</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Use Library to download tracks via the audio player. Job history is available under History with full style
-            metadata.
-          </p>
-        </div>
       </section>
     </div>
   );

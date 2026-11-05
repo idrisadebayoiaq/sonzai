@@ -110,9 +110,10 @@ export async function POST(req: NextRequest) {
       .eq("id", job_id);
 
     const options = (job.options || {}) as Record<string, unknown>;
-    const sampleMode = options.mode === "simple";
+    const task = String(options.task || "text2music");
+    const sampleMode = options.mode === "simple" || task === "radio";
     const prompt = buildPrompt(job);
-    const durationSec = estimateDurationSec({
+    let durationSec = estimateDurationSec({
       lyrics: sampleMode ? String(options.style_prompt || job.title || "") : job.lyrics,
       songType: job.song_type,
       bpm: job.bpm,
@@ -121,7 +122,44 @@ export async function POST(req: NextRequest) {
     const bpm = job.bpm || null;
     const temperature = Number(options.temperature ?? 0.85);
 
-    let mp3: Buffer;
+    let sourceBase64: string | undefined;
+    let sourceDuration = 0;
+    if (options.source_song_id && !["text2music", "radio"].includes(task)) {
+      const { data: source, error: sourceErr } = await admin
+        .from("songs")
+        .select("storage_path,duration_sec,lyrics")
+        .eq("id", options.source_song_id)
+        .eq("user_id", userData.user.id)
+        .single();
+      if (sourceErr || !source) {
+        await admin.from("jobs").update({ status: "failed", stage: "failed", progress: 100, error: "Source song not found" }).eq("id", job_id);
+        return NextResponse.json({ error: "Source song not found" }, { status: 404 });
+      }
+      const downloaded = await admin.storage.from("generated-songs").download(source.storage_path);
+      if (downloaded.error || !downloaded.data) {
+        await admin.from("jobs").update({ status: "failed", stage: "failed", progress: 100, error: downloaded.error?.message || "Could not read source audio" }).eq("id", job_id);
+        return NextResponse.json({ error: "Could not read source audio" }, { status: 500 });
+      }
+      const bytes = Buffer.from(await downloaded.data.arrayBuffer());
+      sourceBase64 = bytes.toString("base64");
+      sourceDuration = Number(source.duration_sec || 0);
+      if (!job.lyrics && source.lyrics) job.lyrics = source.lyrics;
+    }
+
+    if (task === "extend") {
+      durationSec = Math.min(360, Math.max(30, sourceDuration + Number(options.extra_sec || 60)));
+    }
+
+    const instruction =
+      task === "vocal_stem"
+        ? "Extract the vocals track from the audio:"
+        : task === "instrumental_stem"
+          ? "Extract the drums, bass, guitar, and keyboard tracks from the audio:"
+          : task === "extend"
+            ? "Complete and extend the song, keeping the existing section and singing the rest of the lyrics:"
+            : String(options.instruction || "") || undefined;
+
+    let tracks: Buffer[];
     let duration: number;
     try {
       const result = await generateWithAceMusic({
@@ -129,14 +167,21 @@ export async function POST(req: NextRequest) {
         prompt,
         bpm,
         durationSec,
-        instrumental: Boolean(options.instrumental),
+        instrumental: Boolean(options.instrumental) || task === "instrumental_stem",
         vocalLanguage: String(options.vocal_language || "en"),
         keyScale: String(options.key_scale || ""),
         timeSignature: String(options.time_signature || ""),
         temperature: Number.isFinite(temperature) ? temperature : 0.85,
         sampleMode,
+        task,
+        sourceBase64,
+        repaintStart: options.repaint_start != null ? Number(options.repaint_start) : undefined,
+        repaintEnd: options.repaint_end != null ? Number(options.repaint_end) : task === "extend" ? -1 : undefined,
+        coverStrength: task === "cover" ? Number(options.cover_strength ?? 0.35) : undefined,
+        instruction,
+        batchSize: Number(options.variations) === 2 ? 2 : 1,
       });
-      mp3 = maybeNormalizeMp3(result.mp3);
+      tracks = result.tracks.map((track) => maybeNormalizeMp3(track)).filter((track) => track.byteLength > 1000);
       duration = result.duration;
     } catch (err) {
       const message = err instanceof Error ? err.message : "Generation failed";
@@ -147,7 +192,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: message }, { status: 502 });
     }
 
-    if (mp3.byteLength < 1000) {
+    if (!tracks.length) {
       await admin
         .from("jobs")
         .update({ status: "failed", stage: "failed", progress: 100, error: "Empty audio from AceMusic" })
@@ -156,57 +201,63 @@ export async function POST(req: NextRequest) {
     }
 
     await admin.from("jobs").update({ stage: "uploading", progress: 80 }).eq("id", job_id);
-
-    const storage_path = `${userData.user.id}/${job_id}.mp3`;
-    const { error: upErr } = await admin.storage.from("generated-songs").upload(storage_path, mp3, {
-      contentType: "audio/mpeg",
-      upsert: true,
-    });
-    if (upErr) {
-      await admin
-        .from("jobs")
-        .update({ status: "failed", stage: "failed", progress: 100, error: upErr.message })
-        .eq("id", job_id);
-      return NextResponse.json({ error: upErr.message }, { status: 500 });
-    }
-
-    // Replace any previous demo song for this job (clear FK first)
     await admin.from("jobs").update({ result_song_id: null }).eq("id", job_id);
     await admin.from("songs").delete().eq("job_id", job_id);
 
-    const { data: song, error: songErr } = await admin
-      .from("songs")
-      .insert({
-        user_id: userData.user.id,
-        job_id,
-        title: job.title || "Untitled",
-        storage_path,
-        duration_sec: duration,
-        meta: {
-          engine: "acemusic",
-          engine_provider: "acemusic",
-          demo_mode: false,
-          prompt,
-          bpm,
+    let firstSongId: string | null = null;
+    for (let i = 0; i < tracks.length; i += 1) {
+      const storage_path = `${userData.user.id}/${job_id}-${i}.mp3`;
+      const { error: upErr } = await admin.storage.from("generated-songs").upload(storage_path, tracks[i], {
+        contentType: "audio/mpeg",
+        upsert: true,
+      });
+      if (upErr) {
+        if (!firstSongId) {
+          await admin.from("jobs").update({ status: "failed", stage: "failed", progress: 100, error: upErr.message }).eq("id", job_id);
+          return NextResponse.json({ error: upErr.message }, { status: 500 });
+        }
+        break;
+      }
+
+      const inserted = await admin
+        .from("songs")
+        .insert({
+          user_id: userData.user.id,
+          job_id,
+          title: tracks.length > 1 ? `${job.title || "Untitled"} v${i + 1}` : job.title || "Untitled",
+          storage_path,
           duration_sec: duration,
-          tags: [job.country, job.genre, job.song_type, job.mood],
-        },
-      })
-      .select("id")
-      .single();
+          lyrics: job.lyrics || null,
+          parent_song_id: (options.source_song_id as string) || (i > 0 ? firstSongId : null),
+          meta: {
+            engine: "acemusic",
+            engine_provider: "acemusic",
+            demo_mode: false,
+            prompt,
+            bpm,
+            duration_sec: duration,
+            task,
+            tags: [job.country, job.genre, job.song_type, job.mood, task !== "text2music" ? task : ""].filter(Boolean),
+          },
+        })
+        .select("id")
+        .single();
+      const song = inserted.data as { id: string } | null;
+      const songErr = inserted.error;
 
-    if (songErr || !song) {
-      await admin
-        .from("jobs")
-        .update({ status: "failed", stage: "failed", progress: 100, error: songErr?.message || "song insert failed" })
-        .eq("id", job_id);
-      return NextResponse.json({ error: songErr?.message || "song insert failed" }, { status: 500 });
-    }
-
-    try {
-      await admin.rpc("spend_credit", { p_user_id: userData.user.id, p_amount: 1 });
-    } catch {
-      // non-fatal
+      if (songErr || !song) {
+        if (!firstSongId) {
+          await admin.from("jobs").update({ status: "failed", stage: "failed", progress: 100, error: songErr?.message || "song insert failed" }).eq("id", job_id);
+          return NextResponse.json({ error: songErr?.message || "song insert failed" }, { status: 500 });
+        }
+        break;
+      }
+      if (!firstSongId) firstSongId = song.id;
+      try {
+        await admin.rpc("spend_credit", { p_user_id: userData.user.id, p_amount: 1 });
+      } catch {
+        // non-fatal
+      }
     }
 
     await admin
@@ -215,12 +266,12 @@ export async function POST(req: NextRequest) {
         status: "done",
         stage: "done",
         progress: 100,
-        result_song_id: song.id,
+        result_song_id: firstSongId,
         error: null,
       })
       .eq("id", job_id);
 
-    return NextResponse.json({ status: "done", job_id, song_id: song.id, engine: "acemusic" });
+    return NextResponse.json({ status: "done", job_id, song_id: firstSongId, engine: "acemusic", tracks: tracks.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Server error";
     return NextResponse.json({ error: message }, { status: 500 });

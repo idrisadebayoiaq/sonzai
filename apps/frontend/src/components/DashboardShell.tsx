@@ -12,6 +12,7 @@ const nav = [
   { href: "/dashboard", label: "Overview", exact: true },
   { href: "/dashboard/create", label: "Create" },
   { href: "/dashboard/library", label: "Library" },
+  { href: "/dashboard/explore", label: "Explore" },
   { href: "/dashboard/history", label: "History" },
   { href: "/dashboard/profile", label: "Profile" },
   { href: "/dashboard/settings", label: "Settings" },
@@ -109,7 +110,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 flex items-center justify-between border-b border-[var(--line)] bg-[rgba(11,16,14,0.85)] px-5 py-4 backdrop-blur md:px-8">
           <div>
             <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent)]">Studio</p>
-            <p className="text-sm text-[var(--muted)]">Generate real AceMusic songs from your lyrics & style</p>
           </div>
           <Link href="/dashboard/create" className="btn-primary !px-4 !py-2 text-sm">
             New song

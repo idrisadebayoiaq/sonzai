@@ -14,7 +14,37 @@ type GenInput = {
   timeSignature?: string;
   temperature?: number;
   sampleMode?: boolean;
+  task?: string;
+  sourceBase64?: string;
+  repaintStart?: number;
+  repaintEnd?: number;
+  coverStrength?: number;
+  instruction?: string;
+  batchSize?: number;
 };
+
+const TASK_MAP: Record<string, string> = {
+  extend: "complete",
+  cover: "cover",
+  repaint: "repaint",
+  vocal_stem: "extract",
+  instrumental_stem: "extract",
+  radio: "text2music",
+  text2music: "text2music",
+};
+
+function collectTracks(json: {
+  choices?: { message?: { audio?: { audio_url?: { url?: string }; url?: string }[] } }[];
+}): Buffer[] {
+  const tracks: Buffer[] = [];
+  for (const choice of json.choices || []) {
+    for (const audio of choice.message?.audio || []) {
+      const url = audio?.audio_url?.url || audio?.url;
+      if (url) tracks.push(decodeDataUrl(url));
+    }
+  }
+  return tracks;
+}
 
 function decodeDataUrl(url: string): Buffer {
   // JS split(limit) caps array length — split(",", 1)[1] is undefined (unlike Python).
@@ -24,7 +54,7 @@ function decodeDataUrl(url: string): Buffer {
   return Buffer.from(b64, "base64");
 }
 
-export async function generateWithAceMusic(input: GenInput): Promise<{ mp3: Buffer; duration: number }> {
+export async function generateWithAceMusic(input: GenInput): Promise<{ tracks: Buffer[]; duration: number }> {
   const key = process.env.ACEMUSIC_API_KEY;
   if (!key) throw new Error("ACEMUSIC_API_KEY is not set on the server");
 
@@ -36,25 +66,34 @@ export async function generateWithAceMusic(input: GenInput): Promise<{ mp3: Buff
   const duration = Math.max(15, Math.min(input.durationSec, maxDur));
   const instrumental = Boolean(input.instrumental);
   const sampleMode = Boolean(input.sampleMode);
+  const task = TASK_MAP[input.task || "text2music"] || "text2music";
+  const text = sampleMode
+    ? input.prompt
+    : `<prompt>${input.prompt}</prompt>\n<lyrics>${input.lyrics}</lyrics>`;
+  const content = input.sourceBase64
+    ? [
+        { type: "text", text },
+        { type: "input_audio", input_audio: { data: input.sourceBase64, format: "mp3" } },
+      ]
+    : text;
 
   const body = {
     model,
-    messages: [
-      {
-        role: "user",
-        content: sampleMode
-          ? input.prompt
-          : `<prompt>${input.prompt}</prompt>\n<lyrics>${input.lyrics}</lyrics>`,
-      },
-    ],
+    messages: [{ role: "user", content }],
     lyrics: sampleMode ? "" : input.lyrics,
     sample_mode: sampleMode,
-    thinking: duration >= 120,
+    thinking: task === "text2music" && duration >= 120,
     use_format: false,
     use_cot_caption: false,
     use_cot_language: true,
     use_cot_metas: false,
     temperature: input.temperature ?? 0.85,
+    task_type: task,
+    batch_size: input.batchSize && input.batchSize > 1 ? input.batchSize : undefined,
+    instruction: input.instruction || undefined,
+    repainting_start: input.repaintStart,
+    repainting_end: input.repaintEnd,
+    audio_cover_strength: input.coverStrength,
     audio_config: {
       duration,
       bpm: input.bpm || undefined,
@@ -82,11 +121,10 @@ export async function generateWithAceMusic(input: GenInput): Promise<{ mp3: Buff
   }
 
   const json = await resp.json();
-  const audio = json?.choices?.[0]?.message?.audio?.[0];
-  const url = audio?.audio_url?.url || audio?.url;
-  if (!url) throw new Error("AceMusic response missing audio");
+  const tracks = collectTracks(json);
+  if (!tracks.length) throw new Error("AceMusic response missing audio");
 
-  return { mp3: decodeDataUrl(url), duration };
+  return { tracks, duration };
 }
 
 /** Optional local ffmpeg normalize — ignored if ffmpeg missing */

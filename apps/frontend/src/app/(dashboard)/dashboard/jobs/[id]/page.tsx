@@ -126,9 +126,7 @@ export default function DashboardJobPage() {
         <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">
           {done ? "Song ready" : job?.status === "cancelled" ? "Cancelled" : job?.status === "failed" ? "Failed" : "Generating real song"}
         </h1>
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          AceMusic is composing from your lyrics and style pack. This can take 1–3 minutes.
-        </p>
+            <p className="text-sm text-[var(--muted)]">AceMusic is composing. This can take a few minutes.</p>
       </div>
 
       {error && <p className="text-[var(--danger)]">{error}</p>}
@@ -200,7 +198,7 @@ export default function DashboardJobPage() {
                       title: job.title || job.song?.title || "Untitled",
                       url: job.song!.signed_url!,
                       subtitle: `${job.country} · ${job.genre}`,
-                      tags: [job.country, job.genre],
+                      lyrics: job.lyrics,
                     };
                     if (player.current?.id === job.id) player.toggle();
                     else player.playSong(track);

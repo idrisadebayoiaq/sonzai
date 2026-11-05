@@ -31,18 +31,14 @@ export default function DashboardHomePage() {
     <div className="space-y-10">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Overview</p>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Welcome, {name}</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Your studio hub — credits, recent generations, and shortcuts to create real AceMusic songs from your lyrics and
-          regional style choices.
-        </p>
+        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">{name}</h1>
       </div>
 
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat label="Credits remaining" value={credits === null ? "—" : String(credits)} />
-        <Stat label="Songs in library" value={String(songs.length)} hint="Showing latest 5 below" />
+        <Stat label="Songs in library" value={String(songs.length)} />
         <Stat label="Recent jobs done" value={String(doneJobs)} />
         <Stat label="Recent failures" value={String(failedJobs)} />
       </section>
@@ -66,10 +62,6 @@ export default function DashboardHomePage() {
               Edit profile
             </Link>
           </div>
-          <p className="mt-5 text-sm leading-relaxed text-[var(--muted)]">
-            Each generation spends 1 credit and uses AceMusic with your country, genre, mood, BPM, language mix, and
-            lyrics — not a demo tone.
-          </p>
         </div>
 
         <div className="panel p-6">
@@ -140,40 +132,15 @@ export default function DashboardHomePage() {
           </div>
         )}
       </section>
-
-      <section className="grid gap-6 lg:grid-cols-3">
-        <DetailCard
-          title="How credits work"
-          body="New accounts start with 50 credits. Generating one real song costs 1 credit. Failed jobs do not spend a credit after AceMusic errors."
-        />
-        <DetailCard
-          title="What makes a song “real”"
-          body="Sonzai sends your lyrics plus a style prompt (country, genre, mood, vocal style, language mix, energy, BPM) to AceMusic ACE-Step — not a local beep demo."
-        />
-        <DetailCard
-          title="Tips for better output"
-          body="Write clear verse/chorus structure, pick a matching regional pack, set mood and energy honestly, and keep lyrics at least a few lines long."
-        />
-      </section>
     </div>
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="panel p-5">
       <p className="text-xs uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
       <p className="mt-3 font-[family-name:var(--font-display)] text-3xl font-bold">{value}</p>
-      {hint && <p className="mt-2 text-xs text-[var(--muted)]">{hint}</p>}
-    </div>
-  );
-}
-
-function DetailCard({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="panel p-5">
-      <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">{title}</h3>
-      <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{body}</p>
     </div>
   );
 }

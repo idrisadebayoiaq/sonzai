@@ -37,11 +37,7 @@ export default function DashboardHistoryPage() {
     <div className="space-y-8">
       <div>
         <p className="text-xs uppercase tracking-[0.22em] text-[var(--accent)]">History</p>
-        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">Song generation history</h1>
-        <p className="mt-3 max-w-2xl text-[var(--muted)]">
-          Every job you queue is listed here — pending, processing, completed, failed, or cancelled — with the style
-          choices you submitted.
-        </p>
+        <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-bold">History</h1>
       </div>
 
       <section className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -113,29 +109,6 @@ export default function DashboardHistoryPage() {
         {!loading && filtered.length === 0 && (
           <p className="py-8 text-center text-[var(--muted)]">No jobs in this filter.</p>
         )}
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3">
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">What is logged</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Title, country, genre, song type, mood, BPM, language mix, vocal style, energy, lyrics, voice sample path,
-            status, progress, and errors — enough to retry or debug a generation.
-          </p>
-        </div>
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Failed jobs</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            If AceMusic or upload fails, the job is marked failed with an error message. Credits are only spent after a
-            successful song insert.
-          </p>
-        </div>
-        <div className="panel p-5">
-          <h3 className="font-[family-name:var(--font-display)] text-lg font-semibold">Open a job</h3>
-          <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">
-            Click any title to reopen the live progress view, hear the result when done, or cancel an in-flight request.
-          </p>
-        </div>
       </section>
     </div>
   );

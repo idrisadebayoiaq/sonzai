@@ -3,8 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
-import { createJob, getProfile, uploadVoiceSample } from "@/lib/api";
-import { COUNTRIES, GENRE_CATEGORIES, KEYS, LANGUAGE_MIXES, LYRIC_SECTIONS, MOODS, SONG_TYPES, TIME_SIGNATURES, VOCAL_GENDERS, VOCAL_STYLES } from "@/lib/options";
+import { createJob, getProfile, listPrompts, listVoices, savePrompt, saveVoiceProfile, uploadVoiceSample } from "@/lib/api";
+import { COUNTRIES, GENRE_CATEGORIES, KEYS, LANGUAGE_MIXES, LYRIC_SECTIONS, MOODS, SONG_TYPES, STRUCTURE_PRESETS, TIME_SIGNATURES, VOCAL_GENDERS, VOCAL_STYLES } from "@/lib/options";
 import { estimateDurationSec, formatDuration, LENGTH_PRESETS } from "@/lib/songLength";
 
 export default function DashboardCreatePage() {
@@ -30,6 +30,10 @@ export default function DashboardCreatePage() {
   const [timeSignature, setTimeSignature] = useState("");
   const [negativeStyle, setNegativeStyle] = useState("");
   const [weirdness, setWeirdness] = useState(3);
+  const [variations, setVariations] = useState(1);
+  const [voiceId, setVoiceId] = useState("");
+  const [prompts, setPrompts] = useState<{ id: string; name: string; body: string }[]>([]);
+  const [voices, setVoices] = useState<{ id: string; name: string; sample_path: string }[]>([]);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [consent, setConsent] = useState(false);
   const [credits, setCredits] = useState<number | null>(null);
@@ -53,6 +57,8 @@ export default function DashboardCreatePage() {
     getProfile()
       .then((p) => setCredits(p.credits_remaining ?? 0))
       .catch(() => setCredits(null));
+    listPrompts().then(setPrompts).catch(() => undefined);
+    listVoices().then(setVoices).catch(() => undefined);
   }, []);
 
   async function onSubmit(e: FormEvent) {
@@ -80,9 +86,10 @@ export default function DashboardCreatePage() {
     setLoading(true);
     setError(null);
     try {
-      let voice_sample_path: string | null = null;
+      let voice_sample_path: string | null = voices.find((voice) => voice.id === voiceId)?.sample_path || null;
       if (voiceFile) {
         voice_sample_path = await uploadVoiceSample(voiceFile);
+        await saveVoiceProfile(voiceFile.name.replace(/\.[^.]+$/, ""), voice_sample_path);
       }
       const { job_id } = await createJob(token, {
         title: title || "Untitled",
@@ -107,6 +114,7 @@ export default function DashboardCreatePage() {
           negative_style: negativeStyle.trim(),
           temperature: 0.65 + weirdness * 0.1,
           vocal_language: "en",
+          variations,
         },
       });
       router.push(`/dashboard/jobs/${job_id}`);
@@ -253,10 +261,56 @@ export default function DashboardCreatePage() {
             </label>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <select
+              className="field"
+              defaultValue=""
+              onChange={(event) => {
+                const preset = STRUCTURE_PRESETS.find((item) => item.id === event.target.value);
+                if (!preset) return;
+                setLyrics((current) => (current.trim() ? `${current.trim()}\n\n${preset.text}` : preset.text));
+              }}
+            >
+              <option value="">Structure</option>
+              {STRUCTURE_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>
+                  {preset.label}
+                </option>
+              ))}
+            </select>
+            <select
+              className="field"
+              defaultValue=""
+              onChange={(event) => {
+                const saved = prompts.find((item) => item.id === event.target.value);
+                if (saved) setStylePrompt(saved.body);
+              }}
+            >
+              <option value="">Saved styles</option>
+              {prompts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className="btn-ghost !px-3 !py-1.5 text-sm"
+              onClick={() => {
+                const name = stylePrompt.trim().slice(0, 32);
+                if (!name) return;
+                savePrompt(name, stylePrompt.trim()).then(() => listPrompts().then(setPrompts));
+              }}
+            >
+              Save style
+            </button>
+            <label className="flex items-center gap-2 text-sm text-[var(--muted)]">
+              <input type="checkbox" checked={variations === 2} onChange={(event) => setVariations(event.target.checked ? 2 : 1)} />
+              2 versions
+            </label>
+          </div>
+
           <label className="field block text-sm">
-            <span className="mb-2 block text-[var(--muted)]">
-              {mode === "simple" ? "Describe the song" : "Style of music (optional)"}
-            </span>
             <textarea
               value={stylePrompt}
               onChange={(e) => setStylePrompt(e.target.value)}
@@ -365,7 +419,18 @@ export default function DashboardCreatePage() {
 
           <div className="space-y-3 rounded-xl border border-[var(--line)] bg-black/15 p-4">
             <label className="field block text-sm">
-              <span className="mb-2 block text-[var(--muted)]">Your voice sample (optional, 10–60s)</span>
+              <span className="mb-2 block text-[var(--muted)]">Saved voice</span>
+              <select value={voiceId} onChange={(event) => setVoiceId(event.target.value)}>
+                <option value="">None</option>
+                {voices.map((voice) => (
+                  <option key={voice.id} value={voice.id}>
+                    {voice.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field block text-sm">
+              <span className="mb-2 block text-[var(--muted)]">Or upload a new sample</span>
               <input
                 type="file"
                 accept="audio/mpeg,audio/wav,audio/mp4,audio/x-m4a,audio/webm,.mp3,.wav,.m4a"
