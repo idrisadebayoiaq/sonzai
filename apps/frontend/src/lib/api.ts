@@ -1,7 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
 
-const DAILY_JOB_LIMIT = 8;
-
 export type CreateJobPayload = {
   lyrics: string;
   country: string;
@@ -19,33 +17,40 @@ export type CreateJobPayload = {
 async function requireUser() {
   const supabase = createClient();
   const { data, error } = await supabase.auth.getUser();
-  if (error || !data.user) {
-    throw new Error("Sign in required");
-  }
+  if (error || !data.user) throw new Error("Sign in required");
   return { supabase, user: data.user };
 }
 
 async function signedSongUrl(storagePath: string) {
   const supabase = createClient();
-  const { data, error } = await supabase.storage
-    .from("generated-songs")
-    .createSignedUrl(storagePath, 60 * 60);
+  const { data, error } = await supabase.storage.from("generated-songs").createSignedUrl(storagePath, 60 * 60);
   if (error) return null;
   return data.signedUrl;
 }
 
-async function assertUnderDailyLimit(supabase: ReturnType<typeof createClient>, userId: string) {
-  const start = new Date();
-  start.setUTCHours(0, 0, 0, 0);
-  const { count, error } = await supabase
-    .from("jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", start.toISOString());
+export async function getProfile() {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   if (error) throw new Error(error.message);
-  if ((count ?? 0) >= DAILY_JOB_LIMIT) {
-    throw new Error(`Daily free limit reached (${DAILY_JOB_LIMIT} songs). Try again tomorrow.`);
-  }
+  return data;
+}
+
+export async function updateProfile(patch: {
+  full_name?: string | null;
+  display_name?: string | null;
+  bio?: string | null;
+  country?: string | null;
+  avatar_url?: string | null;
+}) {
+  const { supabase, user } = await requireUser();
+  const { data, error } = await supabase
+    .from("profiles")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", user.id)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+  return data;
 }
 
 export async function uploadVoiceSample(file: File) {
@@ -62,7 +67,11 @@ export async function uploadVoiceSample(file: File) {
 
 export async function createJob(_token: string, payload: CreateJobPayload) {
   const { supabase, user } = await requireUser();
-  await assertUnderDailyLimit(supabase, user.id);
+
+  const { data: profile } = await supabase.from("profiles").select("credits_remaining").eq("id", user.id).maybeSingle();
+  if (profile && profile.credits_remaining <= 0) {
+    throw new Error("No credits remaining. Update credits in Settings or contact support.");
+  }
 
   const { data, error } = await supabase
     .from("jobs")
@@ -86,10 +95,32 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
     .select("id, status")
     .single();
 
-  if (error || !data) {
-    throw new Error(error?.message || "Failed to create job");
-  }
+  if (error || !data) throw new Error(error?.message || "Failed to create job");
+
   return { job_id: data.id as string, status: data.status as string };
+}
+
+/** Starts AceMusic generation for a pending job (long-running; poll job status). */
+export async function startGeneration(jobId: string) {
+  const { supabase } = await requireUser();
+  const { data: sessionData } = await supabase.auth.getSession();
+  const access = sessionData.session?.access_token;
+  if (!access) throw new Error("Sign in required");
+
+  const res = await fetch("/api/generate", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${access}`,
+    },
+    body: JSON.stringify({ job_id: jobId }),
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { error?: string }).error || `Generation failed (${res.status})`);
+  }
+  return res.json();
 }
 
 export async function cancelJob(jobId: string) {
@@ -105,67 +136,38 @@ export async function cancelJob(jobId: string) {
 export async function getJob(_token: string, jobId: string) {
   const { supabase } = await requireUser();
   const { data: job, error } = await supabase.from("jobs").select("*").eq("id", jobId).single();
-  if (error || !job) {
-    throw new Error(error?.message || "Job not found");
-  }
+  if (error || !job) throw new Error(error?.message || "Job not found");
 
   let song = null;
   if (job.result_song_id) {
     const { data: songRow } = await supabase.from("songs").select("*").eq("id", job.result_song_id).maybeSingle();
     if (songRow) {
       song = {
-        id: songRow.id,
-        title: songRow.title,
-        storage_path: songRow.storage_path,
-        duration_sec: songRow.duration_sec,
-        meta: songRow.meta || {},
-        created_at: songRow.created_at,
+        ...songRow,
         signed_url: await signedSongUrl(songRow.storage_path),
       };
     }
   }
 
-  return {
-    id: job.id,
-    status: job.status,
-    progress: job.progress ?? 0,
-    stage: job.stage,
-    error: job.error,
-    title: job.title,
-    country: job.country,
-    genre: job.genre,
-    song_type: job.song_type,
-    mood: job.mood,
-    created_at: job.created_at,
-    song,
-  };
+  return { ...job, song };
 }
 
-export async function listSongs(_token: string) {
+export async function listSongs(_token?: string) {
   const { supabase } = await requireUser();
-  const { data, error } = await supabase
-    .from("songs")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(50);
-
-  if (error) {
-    throw new Error(error.message || "Failed to list songs");
-  }
-
+  const { data, error } = await supabase.from("songs").select("*").order("created_at", { ascending: false }).limit(100);
+  if (error) throw new Error(error.message);
   const songs = [];
   for (const row of data || []) {
-    songs.push({
-      id: row.id,
-      title: row.title,
-      storage_path: row.storage_path,
-      duration_sec: row.duration_sec,
-      meta: row.meta || {},
-      created_at: row.created_at,
-      signed_url: await signedSongUrl(row.storage_path),
-    });
+    songs.push({ ...row, signed_url: await signedSongUrl(row.storage_path) });
   }
   return songs;
+}
+
+export async function listJobs() {
+  const { supabase } = await requireUser();
+  const { data, error } = await supabase.from("jobs").select("*").order("created_at", { ascending: false }).limit(100);
+  if (error) throw new Error(error.message);
+  return data || [];
 }
 
 export async function deleteSong(songId: string, storagePath: string) {
@@ -173,4 +175,21 @@ export async function deleteSong(songId: string, storagePath: string) {
   await supabase.storage.from("generated-songs").remove([storagePath]);
   const { error } = await supabase.from("songs").delete().eq("id", songId);
   if (error) throw new Error(error.message);
+}
+
+export async function deleteProfile() {
+  const { supabase, user } = await requireUser();
+  // Soft-clear profile fields; full auth delete requires service role
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      full_name: null,
+      display_name: "Deleted",
+      bio: null,
+      avatar_url: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+  if (error) throw new Error(error.message);
+  await supabase.auth.signOut();
 }

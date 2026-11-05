@@ -1,10 +1,5 @@
 """
-Sonzai free-path worker.
-
-Polls Supabase jobs (no Redis).
-DEMO_MODE=true → placeholder WAV (works without GPU).
-ACE_STEP_URL set + DEMO_MODE=false → real generation via ACE-Step server.
-Optional voice sample → RVC hook when configured; otherwise noted in meta.
+Sonzai worker — AceMusic / ACE-Step only when DEMO_MODE=false (no silent demo fallback).
 """
 
 from __future__ import annotations
@@ -17,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
-from supabase import create_client
+from supabase import Client, create_client
 
 from demo_audio import write_demo_wav
 from engines import ace_step, voice_convert
@@ -30,17 +25,17 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "https://nwkurqepqhbyislxgito.supabase.co")
 SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() in {"1", "true", "yes"}
-POLL_SECONDS = float(os.getenv("POLL_SECONDS", "2"))
+DEMO_MODE = os.getenv("DEMO_MODE", "false").lower() in {"1", "true", "yes"}
+POLL_SECONDS = float(os.getenv("POLL_SECONDS", "3"))
 
 
-def client():
+def make_client() -> Client:
     if not SERVICE_KEY:
         raise RuntimeError("Set SUPABASE_SERVICE_ROLE_KEY in services/worker/.env")
     return create_client(SUPABASE_URL, SERVICE_KEY)
 
 
-def claim_job(sb):
+def claim_job(sb: Client):
     pending = (
         sb.table("jobs")
         .select("*")
@@ -71,14 +66,14 @@ def claim_job(sb):
     return updated.data[0]
 
 
-def set_progress(sb, job_id: str, progress: int, stage: str | None = None):
+def set_progress(sb: Client, job_id: str, progress: int, stage: str | None = None):
     payload = {"progress": progress, "updated_at": datetime.now(timezone.utc).isoformat()}
     if stage:
         payload["stage"] = stage
     sb.table("jobs").update(payload).eq("id", job_id).execute()
 
 
-def fail_job(sb, job_id: str, error: str):
+def fail_job(sb: Client, job_id: str, error: str):
     sb.table("jobs").update(
         {
             "status": "failed",
@@ -92,20 +87,13 @@ def fail_job(sb, job_id: str, error: str):
 
 def wav_to_mp3(wav_path: Path, mp3_path: Path) -> None:
     cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(wav_path),
-        "-codec:a",
-        "libmp3lame",
-        "-qscale:a",
-        "4",
-        str(mp3_path),
+        "ffmpeg", "-y", "-i", str(wav_path),
+        "-codec:a", "libmp3lame", "-qscale:a", "4", str(mp3_path),
     ]
     subprocess.run(cmd, check=True, capture_output=True)
 
 
-def download_voice_sample(sb, storage_path: str, dest: Path) -> bool:
+def download_voice_sample(sb: Client, storage_path: str, dest: Path) -> bool:
     if not storage_path:
         return False
     try:
@@ -117,11 +105,10 @@ def download_voice_sample(sb, storage_path: str, dest: Path) -> bool:
         return False
 
 
-def process_job(sb, job: dict) -> None:
+def process_job(sb: Client, job: dict) -> None:
     job_id = job["id"]
     user_id = job["user_id"]
     try:
-        # Cancelled while waiting?
         fresh = sb.table("jobs").select("status").eq("id", job_id).single().execute()
         if fresh.data and fresh.data.get("status") == "cancelled":
             print(f"[skip] cancelled {job_id}", flush=True)
@@ -136,9 +123,9 @@ def process_job(sb, job: dict) -> None:
         with tempfile.TemporaryDirectory(prefix="sonzai_") as tmp:
             tmp_path = Path(tmp)
             wav_path = tmp_path / "out.wav"
-            voice_path = tmp_path / "voice_sample"
             converted_path = tmp_path / "converted.wav"
             mp3_path = tmp_path / "out.mp3"
+            voice_path = tmp_path / "voice.wav"
 
             voice_used = False
             voice_converted = False
@@ -149,18 +136,23 @@ def process_job(sb, job: dict) -> None:
                 voice_path = tmp_path / f"voice{ext}"
                 voice_used = download_voice_sample(sb, sample_path, voice_path)
 
-            use_demo = DEMO_MODE or not ace_step.is_configured()
-            if use_demo:
-                demo_dur = min(12.0, float(gen["duration_sec"]))
+            if DEMO_MODE:
+                # Explicit demo only — never silent fallback when DEMO_MODE=false
                 duration = write_demo_wav(
                     wav_path,
-                    duration_sec=demo_dur,
+                    duration_sec=min(12.0, float(gen["duration_sec"])),
                     bpm=int(gen["bpm"]),
                     title=job.get("title") or "demo",
                 )
                 meta_engine = "demo_wav"
                 final_audio = wav_path
             else:
+                if not ace_step.is_configured():
+                    raise RuntimeError(
+                        "DEMO_MODE=false but AceMusic/ACE_STEP is not configured. "
+                        "Set ACEMUSIC_API_KEY in worker .env"
+                    )
+                print(f"[gen] AceMusic start job={job_id} provider={ace_step.provider_name()}", flush=True)
                 gen_out = mp3_path if ace_step.provider_name() == "acemusic" else wav_path
                 duration = ace_step.generate_to_wav(
                     lyrics=gen["lyrics"],
@@ -174,6 +166,7 @@ def process_job(sb, job: dict) -> None:
                 meta_engine = ace_step.provider_name()
                 final_audio = gen_out
                 voice_referenced = bool(voice_used and meta_engine == "acemusic")
+                print(f"[gen] AceMusic done job={job_id} duration={duration}", flush=True)
 
             set_progress(sb, job_id, 55, "vocals")
             if voice_used and voice_convert.is_configured():
@@ -192,6 +185,9 @@ def process_job(sb, job: dict) -> None:
                 mp3_path.write_bytes(final_audio.read_bytes())
             else:
                 wav_to_mp3(final_audio, mp3_path)
+
+            if not mp3_path.exists() or mp3_path.stat().st_size < 1000:
+                raise RuntimeError("Generated audio file is empty or too small")
 
             storage_path = f"{user_id}/{job_id}.mp3"
             set_progress(sb, job_id, 88, "uploading")
@@ -225,6 +221,12 @@ def process_job(sb, job: dict) -> None:
             song_res = sb.table("songs").insert(song_row).execute()
             song_id = song_res.data[0]["id"]
 
+            # spend 1 credit (ignore if function missing / already spent by API)
+            try:
+                sb.rpc("spend_credit", {"p_user_id": user_id, "p_amount": 1}).execute()
+            except Exception as credit_err:
+                print(f"[credits] {credit_err}", flush=True)
+
             sb.table("jobs").update(
                 {
                     "status": "done",
@@ -247,7 +249,7 @@ def main():
         f"ACE_CONFIGURED={ace_step.is_configured()}, RVC={voice_convert.is_configured()})",
         flush=True,
     )
-    sb = client()
+    sb = make_client()
     while True:
         try:
             job = claim_job(sb)
@@ -258,7 +260,11 @@ def main():
                 time.sleep(POLL_SECONDS)
         except Exception as exc:
             print(f"[poll-error] {exc}", flush=True)
-            time.sleep(max(POLL_SECONDS, 3))
+            try:
+                sb = make_client()
+            except Exception:
+                pass
+            time.sleep(max(POLL_SECONDS, 5))
 
 
 if __name__ == "__main__":

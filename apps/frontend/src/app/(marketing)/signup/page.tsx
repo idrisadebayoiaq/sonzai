@@ -27,11 +27,10 @@ export default function SignupPage() {
     setMessage(null);
     try {
       await signUp(email.trim(), password, displayName.trim() || undefined);
-      setMessage("Account created. Redirecting…");
-      router.push("/create");
+      setMessage("Account created. Opening your dashboard…");
+      router.push("/dashboard");
     } catch (err) {
       const text = err instanceof Error ? err.message : "Could not sign up";
-      // If email confirmation is required
       if (text.toLowerCase().includes("confirm")) {
         setMessage("Check your email to confirm your account, then log in.");
       } else {
@@ -46,7 +45,9 @@ export default function SignupPage() {
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-6 py-16">
       <p className="anim-rise text-xs uppercase tracking-[0.22em] text-[var(--accent)]">Get started</p>
       <h1 className="anim-rise-delay-1 mt-3 font-[family-name:var(--font-display)] text-4xl font-bold">Sign up</h1>
-      <p className="anim-rise-delay-2 mt-3 text-[var(--muted)]">Create a free Sonzai account with email + password.</p>
+      <p className="anim-rise-delay-2 mt-3 text-[var(--muted)]">
+        Free account with 50 credits to generate real AceMusic songs.
+      </p>
 
       <form onSubmit={onSubmit} className="anim-rise-delay-3 panel mt-8 space-y-5 p-6">
         <label className="field block text-sm">

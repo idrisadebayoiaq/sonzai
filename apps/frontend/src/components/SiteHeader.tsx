@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 
 const links = [
-  { href: "/create", label: "Create" },
-  { href: "/library", label: "Library" },
   { href: "/how-it-works", label: "How it works" },
+  { href: "/styles", label: "Styles" },
+  { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "About" },
 ];
 
@@ -40,8 +40,8 @@ export function SiteHeader() {
         <div className="flex items-center gap-2 text-sm">
           {!loading && user ? (
             <>
-              <Link href="/account" className="hidden text-[var(--muted)] hover:text-[var(--fg)] sm:inline">
-                {user.email?.split("@")[0]}
+              <Link href="/dashboard" className="btn-primary !px-3 !py-1.5 text-sm">
+                Dashboard
               </Link>
               <button type="button" className="btn-ghost !px-3 !py-1.5 text-sm" onClick={() => signOut()}>
                 Log out

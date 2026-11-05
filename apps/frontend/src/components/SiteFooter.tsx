@@ -1,5 +1,19 @@
 import Link from "next/link";
 
+const productLinks = [
+  { href: "/", label: "Home" },
+  { href: "/how-it-works", label: "How it works" },
+  { href: "/styles", label: "Styles" },
+  { href: "/pricing", label: "Pricing" },
+  { href: "/about", label: "About" },
+];
+
+const accountLinks = [
+  { href: "/login", label: "Login" },
+  { href: "/signup", label: "Signup" },
+  { href: "/dashboard", label: "Dashboard" },
+];
+
 export function SiteFooter() {
   return (
     <footer className="mt-auto border-t border-[var(--line)] px-6 py-10">
@@ -13,35 +27,25 @@ export function SiteFooter() {
         <div className="text-sm">
           <p className="mb-3 font-medium">Product</p>
           <ul className="space-y-2 text-[var(--muted)]">
-            <li>
-              <Link href="/create">Create</Link>
-            </li>
-            <li>
-              <Link href="/library">Library</Link>
-            </li>
-            <li>
-              <Link href="/how-it-works">How it works</Link>
-            </li>
-            <li>
-              <Link href="/pricing">Pricing</Link>
-            </li>
+            {productLinks.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="transition hover:text-[var(--fg)]">
+                  {link.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
         <div className="text-sm">
           <p className="mb-3 font-medium">Account</p>
           <ul className="space-y-2 text-[var(--muted)]">
-            <li>
-              <Link href="/login">Log in</Link>
-            </li>
-            <li>
-              <Link href="/signup">Sign up</Link>
-            </li>
-            <li>
-              <Link href="/account">Account</Link>
-            </li>
-            <li>
-              <Link href="/about">About</Link>
-            </li>
+            {accountLinks.map((link) => (
+              <li key={link.href}>
+                <Link href={link.href} className="transition hover:text-[var(--fg)]">
+                  {link.label}
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </div>
