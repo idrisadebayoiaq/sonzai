@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { deleteSong, listSongs } from "@/lib/api";
+import { SongCover } from "@/components/PlayerBar";
+import { formatPlayback, usePlayer } from "@/components/PlayerProvider";
 
 type Song = {
   id: string;
@@ -25,7 +27,7 @@ export default function DashboardLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [playingId, setPlayingId] = useState<string | null>(null);
+  const player = usePlayer();
 
   useEffect(() => {
     listSongs()
@@ -54,6 +56,16 @@ export default function DashboardLibraryPage() {
     const tags = (s.meta?.tags || []).join(" ").toLowerCase();
     return s.title.toLowerCase().includes(q) || tags.includes(q);
   });
+
+  const playable = filtered
+    .filter((song) => song.signed_url)
+    .map((song) => ({
+      id: song.id,
+      title: song.title,
+      url: song.signed_url as string,
+      subtitle: (song.meta?.tags || []).filter(Boolean).slice(0, 3).join(" · "),
+      tags: (song.meta?.tags || []).map(String),
+    }));
 
   return (
     <div className="space-y-8">
@@ -98,61 +110,73 @@ export default function DashboardLibraryPage() {
       {loading && <p className="text-[var(--muted)]">Loading library…</p>}
       {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
 
-      <ul className="space-y-4">
-        {filtered.map((song) => (
-          <li key={song.id} className="panel p-5">
-            <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="font-[family-name:var(--font-display)] text-xl font-semibold">{song.title}</h2>
-                <p className="mt-1 text-xs text-[var(--muted)]">
-                  {song.created_at ? new Date(song.created_at).toLocaleString() : ""}
-                  {song.duration_sec ? ` · ${Math.round(Number(song.duration_sec))}s` : ""}
-                </p>
-                {song.meta?.tags && song.meta.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {song.meta.tags.filter(Boolean).map((tag) => (
-                      <span key={String(tag)} className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted)]">
-                        {String(tag)}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-3">
-                {song.meta?.engine_provider && !song.meta.demo_mode && (
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--accent-2)]">
-                    {song.meta.engine_provider}
-                  </span>
-                )}
-                {song.meta?.demo_mode && (
-                  <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--danger)]">demo</span>
-                )}
+      <ul className="space-y-3">
+        {filtered.map((song) => {
+          const active = player.current?.id === song.id;
+          return (
+            <li key={song.id} className={`panel p-4 ${active ? "border-[var(--accent)]" : ""}`}>
+              <div className="flex items-center gap-4">
                 <button
                   type="button"
-                  className="text-xs text-[var(--danger)]"
-                  disabled={deletingId === song.id}
-                  onClick={() => onDelete(song)}
+                  disabled={!song.signed_url}
+                  className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl"
+                  onClick={() => {
+                    if (!song.signed_url) return;
+                    if (active) player.toggle();
+                    else
+                      player.playSong(
+                        {
+                          id: song.id,
+                          title: song.title,
+                          url: song.signed_url,
+                          subtitle: (song.meta?.tags || []).filter(Boolean).slice(0, 3).join(" · "),
+                          tags: (song.meta?.tags || []).map(String),
+                        },
+                        playable,
+                      );
+                  }}
                 >
-                  {deletingId === song.id ? "Deleting…" : "Delete"}
+                  <SongCover title={song.title} className="h-full w-full rounded-xl" />
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/25 text-xs font-semibold">
+                    {active && player.playing ? "Pause" : "Play"}
+                  </span>
                 </button>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate font-[family-name:var(--font-display)] text-lg font-semibold">{song.title}</h2>
+                  <p className="mt-1 text-xs text-[var(--muted)]">
+                    {song.created_at ? new Date(song.created_at).toLocaleString() : ""}
+                    {song.duration_sec ? ` · ${formatPlayback(Number(song.duration_sec))}` : ""}
+                  </p>
+                  {song.meta?.tags && song.meta.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {song.meta.tags.filter(Boolean).map((tag) => (
+                        <span
+                          key={String(tag)}
+                          className="rounded-full border border-[var(--line)] px-2 py-0.5 text-[10px] uppercase tracking-wide text-[var(--muted)]"
+                        >
+                          {String(tag)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {song.meta?.demo_mode && (
+                    <span className="text-[10px] uppercase tracking-[0.18em] text-[var(--danger)]">demo</span>
+                  )}
+                  <button
+                    type="button"
+                    className="text-xs text-[var(--danger)]"
+                    disabled={deletingId === song.id}
+                    onClick={() => onDelete(song)}
+                  >
+                    {deletingId === song.id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </div>
-            </div>
-            {song.signed_url ? (
-              <audio
-                controls
-                src={song.signed_url}
-                className="w-full"
-                onPlay={() => setPlayingId(song.id)}
-                onPause={() => setPlayingId((id) => (id === song.id ? null : id))}
-              />
-            ) : (
-              <p className="text-sm text-[var(--muted)]">No playable URL</p>
-            )}
-            {playingId === song.id && song.meta?.prompt && (
-              <p className="mt-3 text-xs leading-relaxed text-[var(--muted)]">Style prompt: {song.meta.prompt}</p>
-            )}
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
 
       {!loading && !error && filtered.length === 0 && (

@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Waveform } from "@/components/Waveform";
 import { cancelJob, getJob, startGeneration } from "@/lib/api";
+import { usePlayer } from "@/components/PlayerProvider";
 import { STAGE_LABELS } from "@/lib/options";
 
 type Job = {
@@ -37,6 +38,7 @@ export default function DashboardJobPage() {
   const [cancelling, setCancelling] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
   const startedRef = useRef(false);
+  const player = usePlayer();
 
   useEffect(() => {
     if (authLoading) return;
@@ -188,8 +190,24 @@ export default function DashboardJobPage() {
                   </button>
                 </div>
               )}
-              {!(job.song?.meta?.demo_mode && regenerating) && (
-                <audio controls src={job.song!.signed_url!} className="w-full" />
+              {!(job.song?.meta?.demo_mode && regenerating) && job.song?.signed_url && (
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => {
+                    const track = {
+                      id: job.id,
+                      title: job.title || job.song?.title || "Untitled",
+                      url: job.song!.signed_url!,
+                      subtitle: `${job.country} · ${job.genre}`,
+                      tags: [job.country, job.genre],
+                    };
+                    if (player.current?.id === job.id) player.toggle();
+                    else player.playSong(track);
+                  }}
+                >
+                  {player.current?.id === job.id && player.playing ? "Pause" : "Play song"}
+                </button>
               )}
               <div className="flex flex-wrap gap-3">
                 <Link href="/dashboard/library" className="btn-primary">

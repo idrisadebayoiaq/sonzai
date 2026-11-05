@@ -5,6 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { getProfile } from "@/lib/api";
+import { PlayerBar } from "@/components/PlayerBar";
+import { PlayerProvider } from "@/components/PlayerProvider";
 
 const nav = [
   { href: "/dashboard", label: "Overview", exact: true },
@@ -45,7 +47,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
     (user.user_metadata?.display_name as string) || user.email?.split("@")[0] || "Creator";
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
+    <PlayerProvider>
+      <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
       <aside className="border-b border-[var(--line)] bg-[rgba(11,16,14,0.95)] lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
         <div className="flex items-center justify-between px-5 py-5">
           <Link href="/dashboard" className="font-[family-name:var(--font-display)] text-xl font-bold">
@@ -112,8 +115,10 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
             New song
           </Link>
         </header>
-        <div className="px-5 py-8 md:px-8">{children}</div>
+        <div className="px-5 py-8 pb-8 md:px-8">{children}</div>
+        <PlayerBar />
       </div>
     </div>
+    </PlayerProvider>
   );
 }

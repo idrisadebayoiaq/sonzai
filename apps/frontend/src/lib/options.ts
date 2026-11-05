@@ -7,16 +7,50 @@ export const COUNTRIES = [
   { code: "GB", name: "United Kingdom" },
 ];
 
-export const GENRES = [
-  "afrobeats",
-  "amapiano",
-  "highlife",
-  "afrosoul",
-  "hiphop",
-  "rnb",
-  "pop",
-  "gospel",
+export const GENRE_CATEGORIES: { id: string; label: string; genres: string[] }[] = [
+  {
+    id: "african",
+    label: "African",
+    genres: ["afrobeats", "amapiano", "highlife", "afro house", "fuji", "gqom", "afrosoul", "bongo flava"],
+  },
+  {
+    id: "hiphop",
+    label: "Hip-Hop & Rap",
+    genres: ["hiphop", "rap", "trap", "drill", "boom bap", "afro trap"],
+  },
+  {
+    id: "country",
+    label: "Country & Folk",
+    genres: ["country", "country pop", "americana", "folk", "bluegrass"],
+  },
+  {
+    id: "electronic",
+    label: "Electronic",
+    genres: ["edm", "house", "techno", "drum and bass", "dubstep", "synthwave", "lofi"],
+  },
+  {
+    id: "rnb",
+    label: "R&B, Soul & Blues",
+    genres: ["rnb", "soul", "neo soul", "blues", "jazz"],
+  },
+  {
+    id: "pop",
+    label: "Pop & Dance",
+    genres: ["pop", "dance pop", "kpop", "latin pop", "reggaeton", "dancehall", "reggae"],
+  },
+  {
+    id: "rock",
+    label: "Rock & Alternative",
+    genres: ["rock", "indie", "alternative", "metal", "punk"],
+  },
+  {
+    id: "gospel",
+    label: "Gospel & Other",
+    genres: ["gospel", "worship", "classical", "soundtrack"],
+  },
 ];
+
+export const GENRES = GENRE_CATEGORIES.flatMap((category) => category.genres);
 
 export const SONG_TYPES = [
   { id: "full_song", label: "Full song" },

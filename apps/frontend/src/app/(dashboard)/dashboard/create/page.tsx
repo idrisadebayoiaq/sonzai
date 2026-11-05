@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { createJob, getProfile, uploadVoiceSample } from "@/lib/api";
-import { COUNTRIES, GENRES, KEYS, LANGUAGE_MIXES, LYRIC_SECTIONS, MOODS, SONG_TYPES, TIME_SIGNATURES, VOCAL_GENDERS, VOCAL_STYLES } from "@/lib/options";
+import { COUNTRIES, GENRE_CATEGORIES, KEYS, LANGUAGE_MIXES, LYRIC_SECTIONS, MOODS, SONG_TYPES, TIME_SIGNATURES, VOCAL_GENDERS, VOCAL_STYLES } from "@/lib/options";
 import { estimateDurationSec, formatDuration, LENGTH_PRESETS } from "@/lib/songLength";
 
 export default function DashboardCreatePage() {
@@ -166,10 +166,14 @@ export default function DashboardCreatePage() {
             <label className="field block text-sm">
               <span className="mb-2 block text-[var(--muted)]">Genre</span>
               <select value={genre} onChange={(e) => setGenre(e.target.value)}>
-                {GENRES.map((g) => (
-                  <option key={g} value={g}>
-                    {g}
-                  </option>
+                {GENRE_CATEGORIES.map((category) => (
+                  <optgroup key={category.id} label={category.label}>
+                    {category.genres.map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </label>
