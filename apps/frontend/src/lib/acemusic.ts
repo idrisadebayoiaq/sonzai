@@ -11,7 +11,10 @@ type GenInput = {
 };
 
 function decodeDataUrl(url: string): Buffer {
-  const b64 = url.includes(",") ? url.split(",", 1)[1] : url;
+  // JS split(limit) caps array length — split(",", 1)[1] is undefined (unlike Python).
+  const comma = url.indexOf(",");
+  const b64 = comma >= 0 ? url.slice(comma + 1) : url;
+  if (!b64) throw new Error("AceMusic audio payload was empty");
   return Buffer.from(b64, "base64");
 }
 
