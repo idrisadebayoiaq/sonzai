@@ -7,10 +7,7 @@ export function Waveform({ className = "" }: { className?: string }) {
         <span
           key={i}
           className="wave-bar w-1.5 rounded-full bg-[linear-gradient(180deg,var(--accent),var(--accent-2))] sm:w-2"
-          style={{
-            height: `${h}%`,
-            animationDelay: `${(i % 8) * 0.12}s`,
-          }}
+          style={{ height: `${h}%`, animationDelay: `${(i % 8) * 0.12}s` }}
         />
       ))}
     </div>

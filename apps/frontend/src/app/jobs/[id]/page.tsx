@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
+import { Waveform } from "@/components/Waveform";
 import { cancelJob, getJob } from "@/lib/api";
 import { STAGE_LABELS } from "@/lib/options";
-import { createClient } from "@/lib/supabase/client";
-import { Waveform } from "@/components/Waveform";
 
 type Job = {
   id: string;
@@ -20,28 +20,36 @@ type Job = {
   song?: {
     title: string;
     signed_url?: string | null;
-    duration_sec?: number | null;
     meta?: {
       demo_mode?: boolean;
       voice_sample_provided?: boolean;
       voice_converted?: boolean;
+      voice_referenced?: boolean;
+      engine_provider?: string;
     };
   } | null;
 };
 
 export default function JobPage() {
   const params = useParams<{ id: string }>();
+  const { session, loading: authLoading } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
+    if (authLoading) return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | undefined;
+    const token = session?.access_token;
+    if (!token) {
+      setError("Sign in required to view this job.");
+      return;
+    }
 
-    async function tick(token: string) {
+    async function tick() {
       try {
-        const data = await getJob(token, params.id);
+        const data = await getJob(token!, params.id);
         if (!cancelled) setJob(data);
         if (["done", "failed", "cancelled"].includes(data.status)) {
           if (timer) clearInterval(timer);
@@ -51,22 +59,13 @@ export default function JobPage() {
       }
     }
 
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      const token = data.session?.access_token;
-      if (!token) {
-        setError("Sign in required to view this job.");
-        return;
-      }
-      tick(token);
-      timer = setInterval(() => tick(token), 2000);
-    });
-
+    tick();
+    timer = setInterval(tick, 2000);
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
     };
-  }, [params.id]);
+  }, [authLoading, session, params.id]);
 
   const done = job?.status === "done" && job.song?.signed_url;
   const canCancel = job && ["pending", "processing"].includes(job.status);
@@ -136,15 +135,14 @@ export default function JobPage() {
 
           {done && (
             <div className="space-y-4 border-t border-[var(--line)] pt-5">
-              {job.song?.meta?.demo_mode && (
-                <p className="text-sm text-[var(--muted)]">
-                  Demo audio for now — connect ACE-Step (Colab/GPU) for real music generation.
-                </p>
+              {job.song?.meta?.engine_provider && (
+                <p className="text-sm text-[var(--muted)]">Engine: {job.song.meta.engine_provider}</p>
               )}
-              {job.song?.meta?.voice_sample_provided && !job.song?.meta?.voice_converted && (
-                <p className="text-sm text-[var(--muted)]">
-                  Voice sample was saved. Conversion activates when an RVC server is configured on the worker.
-                </p>
+              {job.song?.meta?.demo_mode && (
+                <p className="text-sm text-[var(--muted)]">Demo audio — AceMusic key may be missing on the worker.</p>
+              )}
+              {job.song?.meta?.voice_referenced && (
+                <p className="text-sm text-[var(--muted)]">Your voice sample was used as a generation reference.</p>
               )}
               <audio controls src={job.song!.signed_url!} className="w-full" />
               <Link href="/library" className="btn-ghost inline-flex">

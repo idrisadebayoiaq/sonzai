@@ -3,14 +3,14 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/components/AuthProvider";
 import { createJob, uploadVoiceSample } from "@/lib/api";
 import { COUNTRIES, GENRES, LANGUAGE_MIXES, MOODS, SONG_TYPES, VOCAL_STYLES } from "@/lib/options";
-import { createClient } from "@/lib/supabase/client";
 
 export default function CreatePage() {
   const router = useRouter();
-  const [token, setToken] = useState<string | null>(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { user, session, loading: authLoading } = useAuth();
+  const token = session?.access_token ?? null;
   const [title, setTitle] = useState("");
   const [lyrics, setLyrics] = useState("");
   const [country, setCountry] = useState("NG");
@@ -28,19 +28,6 @@ export default function CreatePage() {
 
   const langOptions = useMemo(() => LANGUAGE_MIXES[country] || [], [country]);
   const countryName = COUNTRIES.find((c) => c.code === country)?.name ?? country;
-
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
-      setToken(data.session?.access_token ?? null);
-      setAuthReady(true);
-    });
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-      setToken(session?.access_token ?? null);
-      setAuthReady(true);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
 
   useEffect(() => {
     if (langOptions.length) setLanguageMix(langOptions[0].id);
@@ -97,13 +84,17 @@ export default function CreatePage() {
 
       <div className="grid items-start gap-8 lg:grid-cols-[1.35fr_0.85fr]">
         <form onSubmit={onSubmit} className="anim-rise-delay-2 panel space-y-6 p-6 md:p-8">
-          {authReady && !token && (
+          {!authLoading && !user && (
             <div className="rounded-xl border border-[var(--line)] bg-black/20 px-4 py-3 text-sm text-[var(--muted)]">
               Browse freely.{" "}
               <Link href="/login" className="text-[var(--accent)]">
-                Sign in
+                Log in
               </Link>{" "}
-              when you are ready to generate.
+              or{" "}
+              <Link href="/signup" className="text-[var(--accent)]">
+                sign up
+              </Link>{" "}
+              to generate.
             </div>
           )}
 
