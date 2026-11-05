@@ -136,22 +136,8 @@ def process_job(sb: Client, job: dict) -> None:
                 voice_path = tmp_path / f"voice{ext}"
                 voice_used = download_voice_sample(sb, sample_path, voice_path)
 
-            if DEMO_MODE:
-                # Explicit demo only — never silent fallback when DEMO_MODE=false
-                duration = write_demo_wav(
-                    wav_path,
-                    duration_sec=min(12.0, float(gen["duration_sec"])),
-                    bpm=int(gen["bpm"]),
-                    title=job.get("title") or "demo",
-                )
-                meta_engine = "demo_wav"
-                final_audio = wav_path
-            else:
-                if not ace_step.is_configured():
-                    raise RuntimeError(
-                        "DEMO_MODE=false but AceMusic/ACE_STEP is not configured. "
-                        "Set ACEMUSIC_API_KEY in worker .env"
-                    )
+            # Prefer AceMusic whenever a key is present — never let stale DEMO_MODE workers ship beeps
+            if ace_step.is_configured():
                 print(f"[gen] AceMusic start job={job_id} provider={ace_step.provider_name()}", flush=True)
                 gen_out = mp3_path if ace_step.provider_name() == "acemusic" else wav_path
                 duration = ace_step.generate_to_wav(
@@ -167,6 +153,19 @@ def process_job(sb: Client, job: dict) -> None:
                 final_audio = gen_out
                 voice_referenced = bool(voice_used and meta_engine == "acemusic")
                 print(f"[gen] AceMusic done job={job_id} duration={duration}", flush=True)
+            elif DEMO_MODE:
+                duration = write_demo_wav(
+                    wav_path,
+                    duration_sec=min(12.0, float(gen["duration_sec"])),
+                    bpm=int(gen["bpm"]),
+                    title=job.get("title") or "demo",
+                )
+                meta_engine = "demo_wav"
+                final_audio = wav_path
+            else:
+                raise RuntimeError(
+                    "AceMusic/ACE_STEP is not configured. Set ACEMUSIC_API_KEY in worker .env"
+                )
 
             set_progress(sb, job_id, 55, "vocals")
             if voice_used and voice_convert.is_configured():

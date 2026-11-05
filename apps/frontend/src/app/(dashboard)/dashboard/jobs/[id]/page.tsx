@@ -35,6 +35,7 @@ export default function DashboardJobPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -52,7 +53,10 @@ export default function DashboardJobPage() {
         const data = await getJob(token!, params.id);
         if (!cancelled) setJob(data);
 
-        if (data.status === "pending" && !startedRef.current) {
+        const needsAce =
+          data.status === "pending" ||
+          (data.status === "processing" && ["queued", "api_queued", "composing"].includes(data.stage || ""));
+        if (needsAce && !startedRef.current) {
           startedRef.current = true;
           startGeneration(params.id).catch((err) => {
             if (!cancelled) {
@@ -90,6 +94,26 @@ export default function DashboardJobPage() {
       setError(err instanceof Error ? err.message : "Cancel failed");
     } finally {
       setCancelling(false);
+    }
+  }
+
+  async function onRegenerate() {
+    if (!job) return;
+    setRegenerating(true);
+    setError(null);
+    startedRef.current = true;
+    try {
+      setJob({ ...job, status: "processing", stage: "generating", progress: 20, error: null, song: null });
+      await startGeneration(job.id, { force: true });
+      const token = session?.access_token;
+      if (token) {
+        const fresh = await getJob(token, job.id);
+        setJob(fresh);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Regenerate failed");
+    } finally {
+      setRegenerating(false);
     }
   }
 
@@ -154,11 +178,19 @@ export default function DashboardJobPage() {
                 <p className="text-sm text-[var(--muted)]">Engine: {job.song.meta.engine_provider}</p>
               )}
               {job.song?.meta?.demo_mode && (
-                <p className="text-sm text-[var(--danger)]">
-                  This file was marked demo — check ACEMUSIC_API_KEY on the server.
-                </p>
+                <div className="space-y-3 rounded-xl border border-[var(--danger)]/40 bg-[var(--danger)]/5 p-4">
+                  <p className="text-sm text-[var(--danger)]">
+                    This is placeholder demo audio (not AceMusic). A local worker finished the job before real
+                    generation ran — or ACEMUSIC_API_KEY is missing on the server.
+                  </p>
+                  <button type="button" className="btn-primary" disabled={regenerating} onClick={onRegenerate}>
+                    {regenerating ? "Generating real song…" : "Regenerate with AceMusic"}
+                  </button>
+                </div>
               )}
-              <audio controls src={job.song!.signed_url!} className="w-full" />
+              {!(job.song?.meta?.demo_mode && regenerating) && (
+                <audio controls src={job.song!.signed_url!} className="w-full" />
+              )}
               <div className="flex flex-wrap gap-3">
                 <Link href="/dashboard/library" className="btn-primary">
                   Open library

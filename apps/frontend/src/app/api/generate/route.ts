@@ -34,9 +34,18 @@ function buildPrompt(job: Record<string, unknown>) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { job_id } = await req.json();
+    const body = await req.json();
+    const job_id = body.job_id as string | undefined;
+    const force = Boolean(body.force);
     if (!job_id) {
       return NextResponse.json({ error: "job_id required" }, { status: 400 });
+    }
+
+    if (!process.env.ACEMUSIC_API_KEY) {
+      return NextResponse.json(
+        { error: "ACEMUSIC_API_KEY is not set on the server. Add it in Vercel Project → Settings → Environment Variables." },
+        { status: 503 },
+      );
     }
 
     const authHeader = req.headers.get("authorization") || "";
@@ -62,18 +71,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
 
-    if (["done", "cancelled"].includes(job.status)) {
+    if (job.status === "cancelled" && !force) {
       return NextResponse.json({ status: job.status, job_id });
     }
 
-    // Avoid duplicate AceMusic calls when the job page remounts/refreshes
-    if (job.status === "processing" && (job.progress ?? 0) >= 20) {
+    if (job.status === "done" && !force) {
+      return NextResponse.json({ status: job.status, job_id });
+    }
+
+    // Duplicate guard — api_queued (progress 5) should still start; generating >=20 means in flight
+    if (
+      !force &&
+      job.status === "processing" &&
+      job.stage === "generating" &&
+      (job.progress ?? 0) >= 20
+    ) {
       return NextResponse.json({ status: "processing", job_id, message: "already generating" });
     }
 
     await admin
       .from("jobs")
-      .update({ status: "processing", stage: "generating", progress: 20 })
+      .update({
+        status: "processing",
+        stage: "generating",
+        progress: 20,
+        error: null,
+        result_song_id: null,
+      })
       .eq("id", job_id);
 
     const prompt = buildPrompt(job);
@@ -122,6 +146,10 @@ export async function POST(req: NextRequest) {
         .eq("id", job_id);
       return NextResponse.json({ error: upErr.message }, { status: 500 });
     }
+
+    // Replace any previous demo song for this job (clear FK first)
+    await admin.from("jobs").update({ result_song_id: null }).eq("id", job_id);
+    await admin.from("songs").delete().eq("job_id", job_id);
 
     const { data: song, error: songErr } = await admin
       .from("songs")

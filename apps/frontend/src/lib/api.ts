@@ -73,12 +73,13 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
     throw new Error("No credits remaining. Update credits in Settings or contact support.");
   }
 
+  // Insert already claimed for the AceMusic API so local workers cannot steal the job as demo_wav
   const { data, error } = await supabase
     .from("jobs")
     .insert({
       user_id: user.id,
-      status: "pending",
-      stage: "queued",
+      status: "processing",
+      stage: "api_queued",
       lyrics: payload.lyrics.trim(),
       country: payload.country.toUpperCase(),
       genre: payload.genre.toLowerCase(),
@@ -90,7 +91,7 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
       title: payload.title || "Untitled",
       voice_sample_path: payload.voice_sample_path ?? null,
       energy: payload.energy ?? null,
-      progress: 0,
+      progress: 5,
     })
     .select("id, status")
     .single();
@@ -100,8 +101,8 @@ export async function createJob(_token: string, payload: CreateJobPayload) {
   return { job_id: data.id as string, status: data.status as string };
 }
 
-/** Starts AceMusic generation for a pending job (long-running; poll job status). */
-export async function startGeneration(jobId: string) {
+/** Starts AceMusic generation (long-running; poll job status). Pass force to replace demo tracks. */
+export async function startGeneration(jobId: string, opts?: { force?: boolean }) {
   const { supabase } = await requireUser();
   const { data: sessionData } = await supabase.auth.getSession();
   const access = sessionData.session?.access_token;
@@ -113,7 +114,7 @@ export async function startGeneration(jobId: string) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${access}`,
     },
-    body: JSON.stringify({ job_id: jobId }),
+    body: JSON.stringify({ job_id: jobId, force: Boolean(opts?.force) }),
   });
 
   if (!res.ok) {
